@@ -40,9 +40,9 @@ export const AgentUpdateRequestSchema = z.object({
 export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
 
 export const HeartbeatRequestSchema = z.object({
-  hbCountCap: z.number().optional(), // defaults to no counts
-  searchTSFrom: z.number().int().optional(), // utim, defaults to first hb
-  searchTSTo: z.number().int().optional() //utim, defaults to date.now
+  hbCountCap: z.coerce.number().int().positive().optional(), // defaults to no counts
+  searchTSTo: z.coerce.number().optional(),// utim, defaults to first hb
+  searchTSFrom: z.coerce.number().optional(), //utim, defaults to date.now
 })
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>

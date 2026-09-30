@@ -245,10 +245,11 @@ app.post('/hb', async (_req: Request, res: Response) => {
 })
 
 //get timestamp based on count, start or finish.
+//GET /hb/abc123?searchTSFrom=123&searchTSTo=456&hbCountCap=100
 app.get('/hb/:id', async (_req: Request, res: Response) => {
 	const agentId = _req.params.id
 
-	const result = HeartbeatRequestSchema.safeParse(_req.body)
+	const result = HeartbeatRequestSchema.safeParse(_req.query)
 
 	if (!result.success) {
 		return res.status(400).json({
@@ -257,9 +258,8 @@ app.get('/hb/:id', async (_req: Request, res: Response) => {
 		});
 	}
 
-	let tsTo: number
 
-	if (!result.data.searchTSTo) { tsTo = Date.now() } else { tsTo = result.data.searchTSTo }
+	const tsTo: number = result.data.searchTSTo ?? Date.now()
 
 	//TODO: THIS AMOUNT OF NESTED IFS ARE NOT NORMAL. ROBERT C MARTIN IS COMING.
 
