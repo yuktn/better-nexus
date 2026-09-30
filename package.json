@@ -1,0 +1,19 @@
+{
+  "name": "better-nexus",
+  "private": true,
+  "workspaces": [
+    "server",
+    "web",
+    "agent",
+    "shared"
+  ],
+  "scripts": {
+    "dev:server": "npm run dev -w server",
+    "dev:web": "npm run dev -w web",
+    "dev:agent": "npm run dev -w agent",
+    "build": "npm run build --workspaces --if-present"
+  },
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
