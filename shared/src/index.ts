@@ -30,3 +30,11 @@ export const AgentRegisterRequestSchema = z.object({
 })
 
 export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>;
+
+export const AgentUpdateRequestSchema = z.object({
+  agentId: z.string(),
+  oldValue: z.string(),
+  newValue: z.string()
+})
+
+export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
