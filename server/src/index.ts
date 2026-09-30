@@ -150,8 +150,6 @@ app.patch('/agents/:id', async (_req: Request, res: Response) => {
 			success: false,
 			error: `Database err.`,
 		});
-	} finally {
-		return res.status(500).json({ success: false, error: "This shouldn't happen." })
 	}
 })
 
@@ -184,8 +182,6 @@ app.delete('/agents/:id', async (_req: Request, res: Response) => {
 			success: false,
 			error: `Database err.`,
 		});
-	} finally {
-		return res.status(500).json({ success: false, error: "This shouldn't happen." })
 	}
 })
 
@@ -245,8 +241,6 @@ app.post('/hb', async (_req: Request, res: Response) => {
 		}
 	} catch (e) {
 		res.status(500).json({ success: false, error: "Server Database Failure." })
-	} finally {
-		return res.status(500).json({ success: false, error: "This shouldn't happen." })
 	}
 })
 
@@ -272,13 +266,13 @@ app.get('/hb/:id', async (_req: Request, res: Response) => {
 	try {
 		if (!result.data.hbCountCap) {
 			if (!result.data.searchTSFrom) {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 })
+				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 }).toArray()
 				return res.status(200).json({
 					success: true,
 					data: results
 				});
 			} else {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 })
+				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 }).toArray()
 				return res.status(200).json({
 					success: true,
 					data: results
@@ -286,13 +280,13 @@ app.get('/hb/:id', async (_req: Request, res: Response) => {
 			}
 		} else {
 			if (!result.data.searchTSFrom) {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap)
+				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap).toArray()
 				return res.status(200).json({
 					success: true,
 					data: results
 				});
 			} else {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap)
+				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap).toArray()
 				return res.status(200).json({
 					success: true,
 					data: results
@@ -301,8 +295,6 @@ app.get('/hb/:id', async (_req: Request, res: Response) => {
 		}
 	} catch (e) {
 		return res.status(500).json({ success: false, error: "Server Database Failure." })
-	} finally {
-		return res.status(500).json({ success: false, error: "This shouldn't happen." })
 	}
 })
 
