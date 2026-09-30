@@ -17,7 +17,7 @@ export const AgentSchema = z.object({
   platform: z.enum(["windows", "mac", "linux"]),
   registeredOn : z.number().int(), // U t i m
   lastSeenOn: z.number().int(), // Unix timestamp in milliseconds
-  sourceIp: z.string(), // ipv4 or ipv6, supply by server
+  sourceIP: z.string(), // ipv4 or ipv6, supply by server
   ipType: z.enum(["ipv4", "ipv6"])
 })
 
@@ -38,3 +38,11 @@ export const AgentUpdateRequestSchema = z.object({
 })
 
 export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
+
+export const HeartbeatRequestSchema = z.object({
+  hbCountCap: z.number().optional(), // defaults to no counts
+  searchTSFrom: z.number().int().optional(), // utim, defaults to first hb
+  searchTSTo: z.number().int().optional() //utim, defaults to date.now
+})
+
+export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>

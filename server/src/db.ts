@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import type { Agent } from "@better-nexus/shared";
+import type { Agent, Heartbeat } from "@better-nexus/shared";
 
 const uri =
   process.env.MONGODB_URI ??
@@ -11,6 +11,8 @@ const db = client.db("better-nexus");
 
 export const agents = db.collection<Agent>("agents");
 
+export const heartbeats = db.collection<Heartbeat>("heartbeats");
+
 export async function initDb() {
   await client.connect();
 
@@ -20,6 +22,11 @@ export async function initDb() {
     { agentId: 1 },
     { unique: true }
   );
+  
+  await heartbeats.createIndex({
+    agentId: 1,
+    timestamp: -1,
+  });
 
   console.log("Connected to MongoDB");
 }
