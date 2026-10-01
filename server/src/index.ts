@@ -92,18 +92,10 @@ const MutableAgentKeySchema = AgentSchema
 	.keyof();
 
 
-// /agents?field=agentName
+// /agents
 app.patch('/agents', agentAuth , async (_req: Request, res: Response) => {
 	const agentId = _req.authenticatedAgentId
-	const result = MutableAgentKeySchema.safeParse(_req.query.field);
 	const bodyResult = AgentUpdateRequestSchema.safeParse(_req.body)
-
-	if (!result.success) {
-		return res.status(400).json({
-			success: false,
-			error: `Field ${String(_req.query.field)} does not exist or is immutable.`,
-		});
-	}
 
 	if (!agentId) {
 		return res.status(400).json({
@@ -120,8 +112,7 @@ app.patch('/agents', agentAuth , async (_req: Request, res: Response) => {
 	}
 
 
-	const field = result.data;
-	const { newValue } = bodyResult.data
+	const { field, newValue } = bodyResult.data
 
 	try {
 		const result = await agents.updateOne(

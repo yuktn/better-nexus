@@ -45,10 +45,18 @@ export const AgentRegisterRequestSchema = z.object({
 
 export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>;
 
+//mutable parts
+
 export const AgentUpdateRequestSchema = z.object({
-  agentId: z.string(),
-  newValue: z.string()
-})
+    field: AgentSchema
+        .pick({
+            agentName: true,
+            agentNexusVersion: true,
+        })
+        .keyof(),
+
+    newValue: z.string(),
+});
 
 export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
 
