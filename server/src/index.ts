@@ -5,7 +5,8 @@ import {
 	type AgentRegisterRequest, AgentRegisterRequestSchema,
 	type AgentUpdateRequest, AgentUpdateRequestSchema,
 	type HeartbeatRequest, HeartbeatRequestSchema,
-	type AgentDocument
+	type AgentDocument,
+	type HeartbeatDocument
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
@@ -210,7 +211,7 @@ app.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 
 	const { temp, cpu, memory, timestamp } = result.data
 
-	const hb: Heartbeat = {
+	const hb: HeartbeatDocument = {
 		agentId,
 		temp,
 		cpu,

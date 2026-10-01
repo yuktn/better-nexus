@@ -79,7 +79,6 @@ async function sendHeartbeat() {
     }
 
     const heartbeat: Heartbeat = {
-        agentId,
         temp: 42,
         cpu: 10,
         memory: 25,

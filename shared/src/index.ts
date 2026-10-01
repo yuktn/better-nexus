@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 export const HeartbeatSchema = z.object({
-  agentId: z.uuidv4(), // UUIDv4
   temp: z.number(), // Celsius
   cpu: z.number().min(0).max(100), // Percentage
   memory: z.number().min(0).max(100),
@@ -9,6 +8,17 @@ export const HeartbeatSchema = z.object({
 });
 
 export type Heartbeat = z.infer<typeof HeartbeatSchema>;
+
+
+export const HeartbeatDocumentSchema = z.object({
+  agentId: z.uuidv4(), // UUIDv4
+  temp: z.number(), // Celsius
+  cpu: z.number().min(0).max(100), // Percentage
+  memory: z.number().min(0).max(100),
+  timestamp: z.number().int(), // Unix timestamp in milliseconds
+});
+
+export type HeartbeatDocument = z.infer<typeof HeartbeatDocumentSchema>;
 
 export const AgentSchema = z.object({
   agentId: z.uuidv4(), // UUIDv4
