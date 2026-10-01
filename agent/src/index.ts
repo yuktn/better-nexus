@@ -7,9 +7,11 @@ import {
 } from "@better-nexus/shared";
 
 async function getMemoryLoad(): Promise<number> {
-    const load = Math.round(((await si.mem()).active / (await si.mem()).total) * 100);
+    const mem = await si.mem();
 
-    return load;
+    return Math.round(
+        (mem.active / mem.total) * 100
+    );
 }
 
 async function getCpuLoad(): Promise<number> {
