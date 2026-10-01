@@ -6,13 +6,15 @@ import {
 	type AgentUpdateRequest, AgentUpdateRequestSchema,
 	type HeartbeatRequest, HeartbeatRequestSchema,
 	type AgentDocument,
-	type HeartbeatDocument
+	type HeartbeatDocument,
+	type EnrollmentToken
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
 
-import { initDb, agents, heartbeats } from "./db.js";
+import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
+import { success } from 'zod';
 
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
@@ -27,8 +29,38 @@ app.get('/health', (_req: Request, res: Response) => {
 	res.json({ status: 'ok' });
 });
 
+//#region /server
+
+//issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
+app.post('/server/register', async (_req: Request, res: Response) => {
+	const enrollmentToken = crypto.randomBytes(32).toString('hex');
+	const hashedEnrollmentToken = crypto.createHash('sha256').update(enrollmentToken).digest('hex');
+
+	const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes!
+
+	const token: EnrollmentToken = {
+		hashedEnrollmentToken,
+		expiresAt
+	}
+
+	try {
+		await enrollmentTokens.insertOne(token)
+		return res.status(201).json({
+			success: true, data: {
+				enrollmentToken,
+				expiresAt
+			}
+		})
+	} catch (e) {
+		res.status(500).json({ success: false, error: "Unknown database error" })
+	}
+})
+
+
+//#endregion
 //#region /agents
 
+//requires token from /server/register!
 app.post('/agents', async (_req: Request, res: Response) => {
 	let ipType: 'ipv4' | 'ipv6';
 
@@ -41,11 +73,29 @@ app.post('/agents', async (_req: Request, res: Response) => {
 		});
 	}
 
+	const authHeader = _req.headers.authorization;
+
+	if (!authHeader || !authHeader.startsWith('Bearer ')) {
+		return res.status(401).json({ success: false, error: 'Unauthorized.' });
+	}
+
+	const secret = authHeader.slice(7)
+
+	const hashedEnrollmentToken = crypto.createHash('sha256').update(secret).digest('hex');
+
+	try {
+		const tokenResult = await enrollmentTokens.findOneAndDelete({ hashedEnrollmentToken, expiresAt: { $gt: new Date() } })
+
+		if (!tokenResult) return res.status(401).json({ success: false, error: 'Unauthorized.' });
+	} catch (e) {
+		return res.status(500).json({ success: false, error: "Unknown database error" })
+	}
+
 	const { agentName, agentNexusVersion, platform } = result.data
 
 	const agentId = crypto.randomUUID()
 	const agentIP = _req.ip;
-	
+
 	const agentSecret = crypto.randomBytes(32).toString('hex');
 	const hashedAgentSecret = crypto.createHash('sha256').update(agentSecret).digest('hex');
 
@@ -77,7 +127,7 @@ app.post('/agents', async (_req: Request, res: Response) => {
 
 	try {
 		await agents.insertOne(agent);
-		return res.status(201).json({ success: true, data: {agentId, agentSecret} })
+		return res.status(201).json({ success: true, data: { agentId, agentSecret } })
 	} catch (e) {
 		res.status(500).json({ success: false, error: "Unknown database error" })
 	}
@@ -93,7 +143,7 @@ const MutableAgentKeySchema = AgentSchema
 
 
 // /agents
-app.patch('/agents', agentAuth , async (_req: Request, res: Response) => {
+app.patch('/agents', agentAuth, async (_req: Request, res: Response) => {
 	const agentId = _req.authenticatedAgentId
 	const bodyResult = AgentUpdateRequestSchema.safeParse(_req.body)
 
@@ -151,7 +201,12 @@ app.patch('/agents', agentAuth , async (_req: Request, res: Response) => {
 	}
 })
 
-app.delete('/agents/', agentAuth , async (_req: Request, res: Response) => {
+//rotate key
+app.post('/agents/key', agentAuth, async (_req: Request, res: Response) => {
+
+})
+
+app.delete('/agents/', agentAuth, async (_req: Request, res: Response) => {
 	const agentId = _req.authenticatedAgentId
 
 	if (!agentId) {
@@ -191,7 +246,7 @@ app.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 	const result = HeartbeatSchema.safeParse(_req.body)
 
 	const agentId = _req.authenticatedAgentId
-	if (!agentId) return res.status(500).json({success: false, error: "Server Error."})
+	if (!agentId) return res.status(500).json({ success: false, error: "Server Error." })
 
 	if (!result.success) {
 		return res.status(400).json({

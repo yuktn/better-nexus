@@ -9,7 +9,6 @@ export const HeartbeatSchema = z.object({
 
 export type Heartbeat = z.infer<typeof HeartbeatSchema>;
 
-
 export const HeartbeatDocumentSchema = z.object({
   agentId: z.uuidv4(), // UUIDv4
   temp: z.number(), // Celsius
@@ -19,6 +18,13 @@ export const HeartbeatDocumentSchema = z.object({
 });
 
 export type HeartbeatDocument = z.infer<typeof HeartbeatDocumentSchema>;
+
+export const EnrollmentTokenSchema = z.object({
+  hashedEnrollmentToken: z.string(),
+  expiresAt: z.date() //date because mongodb ttl
+})
+
+export type EnrollmentToken = z.infer<typeof EnrollmentTokenSchema>
 
 export const AgentSchema = z.object({
   agentId: z.uuidv4(), // UUIDv4
