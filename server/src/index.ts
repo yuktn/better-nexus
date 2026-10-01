@@ -4,11 +4,14 @@ import {
 	type Agent, AgentSchema,
 	type AgentRegisterRequest, AgentRegisterRequestSchema,
 	type AgentUpdateRequest, AgentUpdateRequestSchema,
-	type HeartbeatRequest, HeartbeatRequestSchema
+	type HeartbeatRequest, HeartbeatRequestSchema,
+	type AgentDocument
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
+import crypto from 'node:crypto';
 
 import { initDb, agents, heartbeats } from "./db.js";
+import { agentAuth } from './middleware/agentAuth.js';
 
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
@@ -25,7 +28,7 @@ app.get('/health', (_req: Request, res: Response) => {
 
 //#region /agents
 
-app.post('/agents/register', async (_req: Request, res: Response) => {
+app.post('/agents', async (_req: Request, res: Response) => {
 	let ipType: 'ipv4' | 'ipv6';
 
 	const result = AgentRegisterRequestSchema.safeParse(_req.body);
@@ -41,6 +44,9 @@ app.post('/agents/register', async (_req: Request, res: Response) => {
 
 	const agentId = crypto.randomUUID()
 	const agentIP = _req.ip;
+	
+	const agentSecret = crypto.randomBytes(32).toString('hex');
+	const hashedAgentSecret = crypto.createHash('sha256').update(agentSecret).digest('hex');
 
 	if (!agentIP) {
 		return res.status(400).json({ success: false, error: "Network Error" })
@@ -56,7 +62,7 @@ app.post('/agents/register', async (_req: Request, res: Response) => {
 
 	const currentTime: number = Date.now() // = registeredOn, = lastSeenOn
 
-	const agent: Agent = {
+	const agent: AgentDocument = {
 		agentId,
 		agentName,
 		agentNexusVersion,
@@ -64,12 +70,13 @@ app.post('/agents/register', async (_req: Request, res: Response) => {
 		registeredOn: currentTime,
 		lastSeenOn: currentTime,
 		sourceIP: agentIP,
-		ipType
+		ipType,
+		hashedAgentSecret
 	}
 
 	try {
 		await agents.insertOne(agent);
-		return res.status(201).json({ success: true, data: agent })
+		return res.status(201).json({ success: true, data: {agentId, agentSecret} })
 	} catch (e) {
 		res.status(500).json({ success: false, error: "Unknown database error" })
 	}
@@ -84,11 +91,11 @@ const MutableAgentKeySchema = AgentSchema
 	.keyof();
 
 
-// /agents/:id?field=agentName
-app.patch('/agents/:id', async (_req: Request, res: Response) => {
+// /agents?field=agentName
+app.patch('/agents', agentAuth , async (_req: Request, res: Response) => {
+	const agentId = _req.authenticatedAgentId
 	const result = MutableAgentKeySchema.safeParse(_req.query.field);
 	const bodyResult = AgentUpdateRequestSchema.safeParse(_req.body)
-	const agentId = _req.params.id;
 
 	if (!result.success) {
 		return res.status(400).json({
@@ -113,13 +120,12 @@ app.patch('/agents/:id', async (_req: Request, res: Response) => {
 
 
 	const field = result.data;
-	const { oldValue, newValue } = bodyResult.data
+	const { newValue } = bodyResult.data
 
 	try {
 		const result = await agents.updateOne(
 			{
 				agentId,
-				[field]: oldValue,
 			},
 			{
 				$set: {
@@ -153,8 +159,8 @@ app.patch('/agents/:id', async (_req: Request, res: Response) => {
 	}
 })
 
-app.delete('/agents/:id', async (_req: Request, res: Response) => {
-	const agentId = _req.params.id;
+app.delete('/agents/', agentAuth , async (_req: Request, res: Response) => {
+	const agentId = _req.authenticatedAgentId
 
 	if (!agentId) {
 		return res.status(400).json({
@@ -189,8 +195,11 @@ app.delete('/agents/:id', async (_req: Request, res: Response) => {
 
 //#region /hb
 
-app.post('/hb', async (_req: Request, res: Response) => {
+app.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 	const result = HeartbeatSchema.safeParse(_req.body)
+
+	const agentId = _req.authenticatedAgentId
+	if (!agentId) return res.status(500).json({success: false, error: "Server Error."})
 
 	if (!result.success) {
 		return res.status(400).json({
@@ -199,7 +208,7 @@ app.post('/hb', async (_req: Request, res: Response) => {
 		});
 	}
 
-	const { agentId, temp, cpu, memory, timestamp } = result.data
+	const { temp, cpu, memory, timestamp } = result.data
 
 	const hb: Heartbeat = {
 		agentId,

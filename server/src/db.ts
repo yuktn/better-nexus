@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import type { Agent, Heartbeat } from "@better-nexus/shared";
+import type { Agent, Heartbeat, AgentDocument } from "@better-nexus/shared";
 
 const uri =
   process.env.MONGODB_URI ??
@@ -9,7 +9,7 @@ const client = new MongoClient(uri);
 
 const db = client.db("better-nexus");
 
-export const agents = db.collection<Agent>("agents");
+export const agents = db.collection<AgentDocument>("agents");
 
 export const heartbeats = db.collection<Heartbeat>("heartbeats");
 

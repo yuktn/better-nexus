@@ -23,6 +23,10 @@ export const AgentSchema = z.object({
 
 export type Agent = z.infer<typeof AgentSchema>;
 
+export type AgentDocument = Agent & {
+    hashedAgentSecret: string;
+};
+
 export const AgentRegisterRequestSchema = z.object({
   agentName: z.string(),
   agentNexusVersion: z.string(),
@@ -33,7 +37,6 @@ export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>;
 
 export const AgentUpdateRequestSchema = z.object({
   agentId: z.string(),
-  oldValue: z.string(),
   newValue: z.string()
 })
 

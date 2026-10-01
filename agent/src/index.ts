@@ -8,26 +8,31 @@ import {
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
 let agentId: string | undefined;
+let agentSecret: string | undefined;
 
 try {
     const fileContent = await readFile("./config.json", "utf8");
     const config = JSON.parse(fileContent);
 
     agentId = config.agentId;
+    agentSecret = config.agentSecret;
 
     console.log("Successfully retrieved Agent ID:", agentId);
 } catch {
     console.log("No existing config found.");
 }
 
-async function registerAgent(): Promise<string> {
+async function registerAgent(): Promise<{
+    agentId: string;
+    agentSecret: string;
+}> {
     const reg: AgentRegisterRequest = {
         agentName: "testDevice",
         agentNexusVersion: "0.1.0",
         platform: "linux",
     };
 
-    const response = await fetch(`http://localhost:${port}/agents/register`, {
+    const response = await fetch(`http://localhost:${port}/agents`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -42,24 +47,35 @@ async function registerAgent(): Promise<string> {
     const responseData = await response.json();
 
     const newAgentId = responseData.data.agentId;
+    const newAgentSecret = responseData.data.agentSecret;
 
     await writeFile(
         "./config.json",
-        JSON.stringify(responseData.data, null, 2),
+        JSON.stringify(
+            {
+                agentId: newAgentId,
+                agentSecret: newAgentSecret,
+            },
+            null,
+            2
+        ),
         "utf8"
     );
 
     console.log("Successfully registered:", newAgentId);
 
-    return newAgentId;
+    return {
+        agentId: newAgentId,
+        agentSecret: newAgentSecret,
+    };
 }
 
 const sleep = (ms: number) =>
-    new Promise(resolve => setTimeout(resolve, ms));
+    new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 async function sendHeartbeat() {
-    if (!agentId) {
-        throw new Error("Agent ID is missing");
+    if (!agentId || !agentSecret) {
+        throw new Error("Agent credentials are missing");
     }
 
     const heartbeat: Heartbeat = {
@@ -73,6 +89,8 @@ async function sendHeartbeat() {
     const response = await fetch(`http://localhost:${port}/hb`, {
         method: "POST",
         headers: {
+            "X-Nexus-Agent-ID": agentId,
+            "Authorization": `Bearer ${agentSecret}`,
             "Content-Type": "application/json",
         },
         body: JSON.stringify(heartbeat),
@@ -97,8 +115,11 @@ async function heartbeatLoop() {
     }
 }
 
-if (!agentId) {
-    agentId = await registerAgent();
+if (!agentId || !agentSecret) {
+    const credentials = await registerAgent();
+
+    agentId = credentials.agentId;
+    agentSecret = credentials.agentSecret;
 }
 
 await heartbeatLoop();
