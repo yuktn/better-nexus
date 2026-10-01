@@ -14,7 +14,6 @@ import crypto from 'node:crypto';
 
 import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
-import { success } from 'zod';
 
 const app = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;

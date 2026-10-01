@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@better-nexus/shared": "1.0.0",
+    "systeminformation": "^5.33.15",
     "zod": "^4.6.5"
   },
   "devDependencies": {

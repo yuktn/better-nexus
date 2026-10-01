@@ -1,9 +1,28 @@
 import { writeFile, readFile } from "node:fs/promises";
+import si from 'systeminformation';
 
 import {
     type AgentRegisterRequest,
     type Heartbeat,
 } from "@better-nexus/shared";
+
+async function getMemoryLoad(): Promise<number> {
+    const load = Math.round((await si.mem()).active / (await si.mem()).total) * 100;
+
+    return load;
+}
+
+async function getCpuLoad(): Promise<number> {
+    const cpu = await si.currentLoad();
+
+    return Math.round(cpu.currentLoad)
+}
+
+async function getTemp(): Promise<number> {
+    const temp = await si.cpuTemperature();
+
+    return Math.round(temp.main)
+}
 
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
@@ -79,9 +98,9 @@ async function sendHeartbeat() {
     }
 
     const heartbeat: Heartbeat = {
-        temp: 42,
-        cpu: 10,
-        memory: 25,
+        temp: await getTemp(),
+        cpu: await getCpuLoad(),
+        memory: await getMemoryLoad(),
         timestamp: Date.now(),
     };
 
