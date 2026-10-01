@@ -11,7 +11,7 @@ import { isIP } from 'node:net';
 import { initDb, agents, heartbeats } from "./db.js";
 
 const app = express();
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
 app.use(express.json());
 
