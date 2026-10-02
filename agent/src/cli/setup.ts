@@ -10,6 +10,12 @@ const s = spinner();
 intro(`setup your nexus agent`);
 
 try {
+    const serverURL = await text({ message: 'what is the url / ip of your server?', placeholder: 'https://nexus.yuktn.dev:8081'})
+
+    if (isCancel(serverURL)) {
+        cancel('SIGINT');
+        process.exit(0);
+    }
 
     const token = await text({ message: 'insert enrollment token here! (run nexus-server enroll if you do not have one!)' })
 

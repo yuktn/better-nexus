@@ -100,7 +100,9 @@ try {
             "utf8"
         );
     } catch (e) {
-        cancel('error while editing local file, config.json is stale.')
+        s.stop('Server updated, local update failed');
+        cancel('config.json is stale.');
+        process.exit(1);
     }
 
     s.stop('Success!')
