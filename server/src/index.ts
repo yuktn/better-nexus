@@ -31,10 +31,25 @@ app.get('/health', (_req: Request, res: Response) => {
 
 //#region /server
 
-//TODO: Protect
+//TODO: Protect with OTP as well
 
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
 app.post('/server/register', async (_req: Request, res: Response) => {
+
+	const addr = _req.socket.remoteAddress;
+
+	const isLocal =
+		addr === '127.0.0.1' ||
+		addr === '::1' ||
+		addr === '::ffff:127.0.0.1';
+
+	if (!isLocal) {
+		return res.status(403).json({
+			success: false,
+			error: 'Local access only'
+		});
+	}
+
 	const enrollmentToken = crypto.randomBytes(32).toString('hex');
 	const hashedEnrollmentToken = crypto.createHash('sha256').update(enrollmentToken).digest('hex');
 

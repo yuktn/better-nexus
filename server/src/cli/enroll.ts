@@ -1,10 +1,36 @@
-import { intro, cancel, outro, log, spinner } from '@clack/prompts';
+import { intro, cancel, outro, text, log, spinner, isCancel } from '@clack/prompts';
+import { writeFile, readFile } from "node:fs/promises";
+import { generateSecret, generate, verify, generateURI } from "otplib";
 
 const s = spinner();
 
 intro(`enroll your nexus agent`);
 
 try {
+    const secretContent = await readFile("./server.token", "utf8");
+
+    const secret = secretContent.trim()
+
+    if (!secret) {
+        cancel('no agent credentials - run setup!')
+        process.exit(0)
+    }
+
+    while (true) {
+        const token = await text({ message: "input your OTP token here!" })
+
+        if (isCancel(token)) {
+            cancel("sigint")
+            process.exit(1)
+        }
+
+        if ((await verify({ secret, token })).valid) {
+            break;
+        } else {
+            log.info('wrong otp code!')
+        }
+    }
+
 
     s.start('requesting enrollment to server')
 

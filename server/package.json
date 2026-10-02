@@ -13,6 +13,8 @@
     "@clack/prompts": "^1.8.1",
     "express": "^5.2.1",
     "mongodb": "^7.7.0",
+    "otplib": "^13.5.0",
+    "qr": "^0.7.2",
     "zod": "^4.6.5"
   },
   "devDependencies": {
