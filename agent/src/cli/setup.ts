@@ -96,13 +96,13 @@ try {
 
 
     await writeFile(
-        "../../config.json",
+        "./config.json",
         JSON.stringify(agentInfo, null, 2),
         "utf8"
     );
 
     await writeFile(
-        "../../agent.token",
+        "./agent.token",
         agentSecret,
         {
             encoding: "utf8",
