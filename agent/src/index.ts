@@ -1,6 +1,5 @@
 import { writeFile, readFile } from "node:fs/promises";
 import si from 'systeminformation';
-
 import {
     type AgentRegisterRequest,
     type Heartbeat,

@@ -31,7 +31,7 @@ export const AgentSchema = z.object({
   agentName: z.string(), // set by agent
   agentNexusVersion: z.string(),
   platform: z.enum(["windows", "mac", "linux"]),
-  registeredOn : z.number().int(), // U t i m
+  registeredOn: z.number().int(), // U t i m
   lastSeenOn: z.number().int(), // Unix timestamp in milliseconds
   sourceIP: z.string(), // ipv4 or ipv6, supply by server
   ipType: z.enum(["ipv4", "ipv6"])
@@ -40,7 +40,7 @@ export const AgentSchema = z.object({
 export type Agent = z.infer<typeof AgentSchema>;
 
 export type AgentDocument = Agent & {
-    hashedAgentSecret: string;
+  hashedAgentSecret: string;
 };
 
 export const AgentRegisterRequestSchema = z.object({
@@ -54,14 +54,14 @@ export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>;
 //mutable parts
 
 export const AgentUpdateRequestSchema = z.object({
-    field: AgentSchema
-        .pick({
-            agentName: true,
-            agentNexusVersion: true,
-        })
-        .keyof(),
+  field: AgentSchema
+    .pick({
+      agentName: true,
+      agentNexusVersion: true,
+    })
+    .keyof(),
 
-    newValue: z.string(),
+  newValue: z.string(),
 });
 
 export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
@@ -74,3 +74,14 @@ export const HeartbeatRequestSchema = z.object({
 })
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>
+
+
+//for agent side config.json
+export const AgentInfoSchema = AgentSchema.pick({
+  agentId: true,
+  agentName: true,
+  agentNexusVersion: true,
+  platform: true,
+});
+
+export type AgentInfo = z.infer<typeof AgentInfoSchema>;

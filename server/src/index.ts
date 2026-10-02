@@ -5,6 +5,7 @@ import {
 	type AgentRegisterRequest, AgentRegisterRequestSchema,
 	type AgentUpdateRequest, AgentUpdateRequestSchema,
 	type HeartbeatRequest, HeartbeatRequestSchema,
+	type AgentInfo, AgentInfoSchema,
 	type AgentDocument,
 	type HeartbeatDocument,
 	type EnrollmentToken
@@ -29,6 +30,8 @@ app.get('/health', (_req: Request, res: Response) => {
 });
 
 //#region /server
+
+//TODO: Protect
 
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
 app.post('/server/register', async (_req: Request, res: Response) => {
@@ -126,7 +129,7 @@ app.post('/agents', async (_req: Request, res: Response) => {
 
 	try {
 		await agents.insertOne(agent);
-		return res.status(201).json({ success: true, data: { agentId, agentSecret } })
+		return res.status(201).json({ success: true, data: { agentId, agentName, agentNexusVersion, platform, agentSecret } })
 	} catch (e) {
 		res.status(500).json({ success: false, error: "Unknown database error" })
 	}
@@ -268,15 +271,6 @@ app.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 		return res.status(400).json({
 			success: false,
 			error: "No ID provided.",
-		});
-	}
-
-	const dbLookupResult = await agents.findOne({ agentId })
-
-	if (!dbLookupResult) {
-		return res.status(404).json({
-			success: false,
-			error: `No such agent.`,
 		});
 	}
 

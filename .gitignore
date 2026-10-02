@@ -11,3 +11,4 @@ coverage/
 
 #this will contain agent secret
 agent/config.json
+agent/agent.token
