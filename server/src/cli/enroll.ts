@@ -7,28 +7,12 @@ const s = spinner();
 intro(`enroll your nexus agent`);
 
 try {
-    const secretContent = await readFile("./server.token", "utf8");
 
-    const secret = secretContent.trim()
+    const token = await text({ message: "input your OTP token here!" })
 
-    if (!secret) {
-        cancel('no agent credentials - run setup!')
-        process.exit(0)
-    }
-
-    while (true) {
-        const token = await text({ message: "input your OTP token here!" })
-
-        if (isCancel(token)) {
-            cancel("sigint")
-            process.exit(1)
-        }
-
-        if ((await verify({ secret, token })).valid) {
-            break;
-        } else {
-            log.info('wrong otp code!')
-        }
+    if (isCancel(token)) {
+        cancel("sigint")
+        process.exit(1)
     }
 
 
@@ -38,6 +22,7 @@ try {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`
         }
     });
 

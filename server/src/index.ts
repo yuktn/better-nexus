@@ -12,6 +12,8 @@ import {
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
+import { writeFile, readFile } from "node:fs/promises";
+import { generateSecret, generate, verify, generateURI } from "otplib";
 
 import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
@@ -35,6 +37,22 @@ app.get('/health', (_req: Request, res: Response) => {
 
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
 app.post('/server/register', async (_req: Request, res: Response) => {
+
+	const secretContent = await readFile("./server.token", "utf8");
+
+	const secret = secretContent.trim()
+
+	const authHeader = _req.headers.authorization;
+
+	if (!authHeader || !authHeader.startsWith('Bearer ')) {
+		return res.status(401).json({ success: false, error: 'Unauthorized.' });
+	}
+
+	const TOTPToken: string = authHeader.slice(7)
+
+	if (!(await verify({ secret, token: TOTPToken })).valid) {
+		res.status(401).json({ success: false, error: "Unauthorized." })
+	}
 
 	const addr = _req.socket.remoteAddress;
 
