@@ -79,7 +79,13 @@ try {
 
     const responseData = await response.json();
 
-    const { spAgentName, agentSecret, agentId, agentNexusVersion, spPlatform } = responseData.data
+    const {
+        agentName: spAgentName,
+        agentSecret,
+        agentId,
+        agentNexusVersion,
+        platform: spPlatform
+    } = responseData.data;
 
     const agentInfo: AgentInfo = {
         agentName: spAgentName,
@@ -88,26 +94,21 @@ try {
         platform: spPlatform
     }
 
+
     await writeFile(
-        "./config.json",
-        JSON.stringify(agentInfo,
-            null,
-            2
-        ),
+        "../../config.json",
+        JSON.stringify(agentInfo, null, 2),
         "utf8"
     );
 
     await writeFile(
-        "./agent.token",
+        "../../agent.token",
         agentSecret,
         {
             encoding: "utf8",
             mode: 0o600,
         }
     );
-
-    //TODO: Implement read with that version
-
 } catch (e) {
     cancel('error while enrolling: ' + e);
     process.exit(0);

@@ -1,7 +1,6 @@
 import { writeFile, readFile } from "node:fs/promises";
 import si from 'systeminformation';
 import {
-    type AgentRegisterRequest,
     type Heartbeat,
 } from "@better-nexus/shared";
 
@@ -29,66 +28,29 @@ const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
 let agentId: string | undefined;
 let agentSecret: string | undefined;
+let agentName: string | undefined;
 
 try {
     const fileContent = await readFile("./config.json", "utf8");
+    const secretContent = await readFile("./agent.token", "utf8");
     const config = JSON.parse(fileContent);
 
+    agentSecret = secretContent.trim();
     agentId = config.agentId;
-    agentSecret = config.agentSecret;
+    agentName = config.agentName
 
-    console.log("Successfully retrieved Agent ID:", agentId);
-} catch {
+    console.log("Successfully retrieved Agent credentials:", agentId, agentName);
+} catch (e) {
+    console.log(e)
     console.log("No existing config found.");
+    process.exit(1)
 }
 
-async function registerAgent(): Promise<{
-    agentId: string;
-    agentSecret: string;
-}> {
-    const reg: AgentRegisterRequest = {
-        agentName: "testDevice",
-        agentNexusVersion: "0.1.0",
-        platform: "linux",
-    };
-
-    const response = await fetch(`http://localhost:${port}/agents`, {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-        },
-        body: JSON.stringify(reg),
-    });
-
-    if (!response.ok) {
-        throw new Error(`Registration failed: ${response.status}`);
-    }
-
-    const responseData = await response.json();
-
-    const newAgentId = responseData.data.agentId;
-    const newAgentSecret = responseData.data.agentSecret;
-
-    await writeFile(
-        "./config.json",
-        JSON.stringify(
-            {
-                agentId: newAgentId,
-                agentSecret: newAgentSecret,
-            },
-            null,
-            2
-        ),
-        "utf8"
-    );
-
-    console.log("Successfully registered:", newAgentId);
-
-    return {
-        agentId: newAgentId,
-        agentSecret: newAgentSecret,
-    };
+if (!agentId || !agentSecret || !agentName) {
+    console.log("No existing config found.");
+    process.exit(1)
 }
+
 
 const sleep = (ms: number) =>
     new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -132,13 +94,6 @@ async function heartbeatLoop() {
 
         await sleep(3000);
     }
-}
-
-if (!agentId || !agentSecret) {
-    const credentials = await registerAgent();
-
-    agentId = credentials.agentId;
-    agentSecret = credentials.agentSecret;
 }
 
 await heartbeatLoop();
