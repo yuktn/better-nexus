@@ -18,7 +18,7 @@ try {
 
     s.start('requesting enrollment to server')
 
-    const response = await fetch(`http://localhost:8081/server/register`, {
+    const response = await fetch(`http://localhost:8082/admin/register`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
