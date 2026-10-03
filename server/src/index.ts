@@ -33,8 +33,6 @@ app.get('/health', (_req: Request, res: Response) => {
 
 //#region /server
 
-//TODO: Protect with OTP as well
-
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
 app.post('/server/register', async (_req: Request, res: Response) => {
 
@@ -51,7 +49,7 @@ app.post('/server/register', async (_req: Request, res: Response) => {
 	const TOTPToken: string = authHeader.slice(7)
 
 	if (!(await verify({ secret, token: TOTPToken })).valid) {
-		res.status(401).json({ success: false, error: "Unauthorized." })
+		return res.status(401).json({ success: false, error: "Unauthorized." })
 	}
 
 	const addr = _req.socket.remoteAddress;
