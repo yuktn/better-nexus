@@ -76,7 +76,3 @@ admin.post('/admin/register', async (_req: Request, res: Response) => {
 })
 
 //#endregion
-
-admin.listen(8082, "127.0.0.1", () => {
-    console.log("Nexus admin API listening on localhost:8082");
-});

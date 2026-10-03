@@ -31,66 +31,6 @@ api.get('/health', (_req: Request, res: Response) => {
 	res.json({ status: 'ok' });
 });
 
-//#region /server
-
-//issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
-api.post('/server/register', async (_req: Request, res: Response) => {
-
-	const secretContent = await readFile("./server.token", "utf8");
-
-	const secret = secretContent.trim()
-
-	const authHeader = _req.headers.authorization;
-
-	if (!authHeader || !authHeader.startsWith('Bearer ')) {
-		return res.status(401).json({ success: false, error: 'Unauthorized.' });
-	}
-
-	const TOTPToken: string = authHeader.slice(7)
-
-	if (!(await verify({ secret, token: TOTPToken })).valid) {
-		return res.status(401).json({ success: false, error: "Unauthorized." })
-	}
-
-	const addr = _req.socket.remoteAddress;
-
-	const isLocal =
-		addr === '127.0.0.1' ||
-		addr === '::1' ||
-		addr === '::ffff:127.0.0.1';
-
-	if (!isLocal) {
-		return res.status(403).json({
-			success: false,
-			error: 'Local access only'
-		});
-	}
-
-	const enrollmentToken = crypto.randomBytes(32).toString('hex');
-	const hashedEnrollmentToken = crypto.createHash('sha256').update(enrollmentToken).digest('hex');
-
-	const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes!
-
-	const token: EnrollmentToken = {
-		hashedEnrollmentToken,
-		expiresAt
-	}
-
-	try {
-		await enrollmentTokens.insertOne(token)
-		return res.status(201).json({
-			success: true, data: {
-				enrollmentToken,
-				expiresAt
-			}
-		})
-	} catch (e) {
-		res.status(500).json({ success: false, error: "Unknown database error" })
-	}
-})
-
-
-//#endregion
 //#region /agents
 
 //requires token from /server/register!
@@ -377,16 +317,3 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 		return res.status(500).json({ success: false, error: "Server Database Failure." })
 	}
 })
-
-async function start() {
-	await initDb();
-
-	api.listen(port, () => {
-		console.log(`Server listening on port ${port}`);
-	});
-}
-
-start().catch((error) => {
-	console.error("Failed to start server:", error);
-	process.exit(1);
-});
