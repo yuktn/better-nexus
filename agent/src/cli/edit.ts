@@ -44,12 +44,48 @@ try {
         message: `which field do you want to edit?`,
         options: [
             { value: 'agentName', label: `name`, hint: `currently ${agentName}` },
+            { value: 'serverUrl', label: `server url`, hint: `currently ${serverUrl}` },
         ],
     });
 
     if (isCancel(field)) {
         cancel('SIGINT');
         process.exit(0);
+    }
+
+    //for only local changes
+    if (field === "serverUrl") {
+        const newValue = await text({
+            message: `what is the new value of ${field}?`
+        })
+
+        if (isCancel(newValue)) {
+            cancel('SIGINT')
+            process.exit(0)
+        }
+
+        try {
+            const fileContent = await readFile("./config.json", "utf8");
+
+            const config = AgentInfoSchema.parse(JSON.parse(fileContent));
+
+            const newConfig = AgentInfoSchema.parse({
+                ...config,
+                [field]: newValue,
+            });
+
+            await writeFile(
+                "./config.json",
+                JSON.stringify(newConfig, null, 2),
+                "utf8"
+            );
+            log.message(`agent update was successful, ${field} was changed to ${newValue}!`)
+            process.exit(0)
+        } catch (e) {
+            s.stop('local update failed.');
+            cancel('the update was not completed.');
+            process.exit(1);
+        }
     }
 
     const newValue = await text({
