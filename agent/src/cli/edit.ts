@@ -17,6 +17,7 @@ try {
     let agentName: string | undefined;
     let agentNexusVersion: string | undefined;
     let platform: string | undefined;
+    let serverUrl: string | undefined
 
     try {
         const fileContent = await readFile("./config.json", "utf8");
@@ -28,6 +29,7 @@ try {
         agentName = config.agentName;
         agentNexusVersion = config.agentNexusVersion;
         platform = config.platform;
+        serverUrl = config.serverUrl;
     } catch (e) {
         cancel('no agent credentials - run setup!')
         process.exit(0)
@@ -66,7 +68,7 @@ try {
 
     s.start('requesting to server...')
 
-    const response = await fetch(`http://localhost:8081/agents`, {
+    const response = await fetch(`${serverUrl}/agents`, {
         method: "PATCH",
         headers: {
             "Content-Type": "application/json",

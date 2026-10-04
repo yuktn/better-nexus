@@ -10,14 +10,56 @@ const s = spinner();
 intro(`setup your nexus agent`);
 
 try {
-    const serverURL = await text({ message: 'what is the url / ip of your server?', placeholder: 'https://nexus.yuktn.dev:8081'})
+    let serverUrl;
 
-    if (isCancel(serverURL)) {
-        cancel('SIGINT');
-        process.exit(0);
+    while (true) {
+        serverUrl = await text({ message: 'what is the address of your server?', placeholder: 'https://nexus.yuktn.dev' })
+
+        if (isCancel(serverUrl)) {
+            cancel('SIGINT');
+            process.exit(0);
+        }
+
+        try {
+            const url = new URL(serverUrl);
+
+            if (url.protocol !== "http:" && url.protocol !== "https:") {
+                throw new Error();
+            }
+        } catch {
+            log.error("invalid server URL");
+            continue;
+        }
+
+        s.start('verifying server')
+
+        try {
+            const response = await fetch(`${serverUrl}/health`, {
+                method: "GET",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+            });
+
+            s.stop('Success!')
+
+            if (!response.ok) {
+                throw new Error(`server check failed: ${response.status}`);
+            }
+
+            if ((await response.json()).nexus) {
+                break;
+            } else {
+                log.message(`it seems like we can't reach ${serverUrl} or it isn't a valid nexus server url.. (is the main server on?)`)
+            }
+        } catch (e) {
+            log.error('an error occurred while fetching.. try again')
+            s.stop()
+            continue;
+        }
     }
 
-    const token = await text({ message: 'insert enrollment token here! (run nexus-server enroll if you do not have one!)' })
+    const token = await text({ message: 'insert enrollment token here! (run nexus-server on the server machine enroll if you do not have one!)' })
 
     if (isCancel(token)) {
         cancel('SIGINT');
@@ -68,7 +110,7 @@ try {
 
     s.start('requesting to server...')
 
-    const response = await fetch(`http://localhost:8081/agents`, {
+    const response = await fetch(`${serverUrl}/agents`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -81,9 +123,9 @@ try {
         throw new Error(`Registration failed: ${response.status}`);
     }
 
-    s.stop('Success!');
-
     const responseData = await response.json();
+
+    s.stop('Success!');
 
     const {
         agentName: spAgentName,
@@ -93,11 +135,12 @@ try {
         platform: spPlatform
     } = responseData.data;
 
-    const agentInfo: AgentInfo = {
+    const agentInfo = {
         agentName: spAgentName,
         agentNexusVersion,
         agentId,
-        platform: spPlatform
+        platform: spPlatform,
+        serverUrl
     }
 
 

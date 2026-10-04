@@ -28,8 +28,9 @@ admin.get('/', (_req: Request, res: Response) => {
 });
 
 admin.get('/health', (_req: Request, res: Response) => {
-    res.json({ status: 'ok' });
+    return res.status(200).json({ success: true, nexus: true });
 });
+
 
 //#region /server
 

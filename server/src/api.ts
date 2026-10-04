@@ -28,7 +28,7 @@ api.get('/', (_req: Request, res: Response) => {
 });
 
 api.get('/health', (_req: Request, res: Response) => {
-	res.json({ status: 'ok' });
+	return res.status(200).json({ success: true, nexus: true });
 });
 
 //#region /agents
