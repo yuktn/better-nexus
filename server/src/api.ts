@@ -306,7 +306,9 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 
 			return res.status(201).json({
 				success: true,
-				data: { hb, id },
+				data: { hb: {
+					...hb, timestamp: hb.timestamp.getTime()
+				}, id },
 			});
 		} else {
 			res.status(500).json({ success: false, error: "Server Database Failure." })
