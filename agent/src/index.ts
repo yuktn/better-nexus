@@ -24,7 +24,6 @@ async function getTemp(): Promise<number> {
     return Math.round(temp.main)
 }
 
-const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
 let agentId: string | undefined;
 let agentSecret: string | undefined;
@@ -69,7 +68,7 @@ async function sendHeartbeat() {
         timestamp: Date.now(),
     };
 
-    const response = await fetch(`${serverUrl}}/hb`, {
+    const response = await fetch(`${serverUrl}/hb`, {
         method: "POST",
         headers: {
             "X-Nexus-Agent-ID": agentId,

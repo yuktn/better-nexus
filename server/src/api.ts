@@ -347,9 +347,15 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 
 	try {
 		const results = await query.toArray()
+
+		const data = results.map(hb => ({
+			...hb,
+			timestamp: hb.timestamp.getTime(),
+		}));
+
 		return res.status(200).json({
 			success: true,
-			data: results
+			data // change to ms!~!
 		});
 	} catch (e) {
 		return res.status(500).json({ success: false, error: "Server Database Failure." })

@@ -82,6 +82,8 @@ export const AgentInfoSchema = AgentSchema.pick({
   agentName: true,
   agentNexusVersion: true,
   platform: true,
+}).extend({
+  serverUrl: z.url()
 });
 
 export type AgentInfo = z.infer<typeof AgentInfoSchema>;
