@@ -1,5 +1,5 @@
 import { writeFile, readFile } from "node:fs/promises";
-import si from 'systeminformation';
+import si, { cpuFlags } from 'systeminformation';
 import {
     type Heartbeat,
 } from "@better-nexus/shared";
@@ -29,6 +29,7 @@ const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 let agentId: string | undefined;
 let agentSecret: string | undefined;
 let agentName: string | undefined;
+let serverUrl: string | undefined;
 
 try {
     const fileContent = await readFile("./config.json", "utf8");
@@ -38,6 +39,7 @@ try {
     agentSecret = secretContent.trim();
     agentId = config.agentId;
     agentName = config.agentName
+    serverUrl = config.serverUrl
 
     console.log("Successfully retrieved Agent credentials:", agentId, agentName);
 } catch (e) {
@@ -67,7 +69,7 @@ async function sendHeartbeat() {
         timestamp: Date.now(),
     };
 
-    const response = await fetch(`http://localhost:${port}/hb`, {
+    const response = await fetch(`${serverUrl}}/hb`, {
         method: "POST",
         headers: {
             "X-Nexus-Agent-ID": agentId,
