@@ -19,3 +19,10 @@ wip
 ### Web
 
 ### Agent
+
+
+## AI Usage
+
+There was minimal use of AI in the backend (server/agent). All the logic, types, zod, db configuration was done by myself.  
+
+The frontend was assisted with AI, but was not fully done by it.
