@@ -14,7 +14,7 @@ export const HeartbeatDocumentSchema = z.object({
   temp: z.number(), // Celsius
   cpu: z.number().min(0).max(100), // Percentage
   memory: z.number().min(0).max(100),
-  timestamp: z.number().int(), // Unix timestamp in milliseconds
+  timestamp: z.date(), // WE need to aggregate
 });
 
 export type HeartbeatDocument = z.infer<typeof HeartbeatDocumentSchema>;

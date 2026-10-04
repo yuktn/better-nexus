@@ -287,7 +287,7 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 		temp,
 		cpu,
 		memory,
-		timestamp
+		timestamp: new Date(timestamp)
 	}
 
 	if (!agentId) {
@@ -331,40 +331,26 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 	}
 
 
-	const tsTo: number = result.data.searchTSTo ?? Date.now()
+	const tsTo = new Date(result.data.searchTSTo ?? Date.now())
 
-	//TODO: THIS AMOUNT OF NESTED IFS ARE NOT NORMAL. ROBERT C MARTIN IS COMING.
+	const tsFrom = new Date(result.data.searchTSFrom ?? 0)
+
+	//TODO: THIS AMOUNT OF NESTED IFS ARE NOT NORMAL. ROBERT C MARTIN IS COMING. -- FIXED!!!!
+
+	//ok.. lets think shall we
+	//if no hbCountCap: time is larger than searchTSFrom and smaller than searchTSTo
+	//i guess make searchTSFrom to 0 when it doesnt exist?
+
+	//im just goated look at this astra, qwen, fable im coming for you get ready
+
+	const query = result.data.hbCountCap ? heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": tsFrom } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap) : heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": tsFrom } }).sort({ timestamp: -1 })
 
 	try {
-		if (!result.data.hbCountCap) {
-			if (!result.data.searchTSFrom) {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 }).toArray()
-				return res.status(200).json({
-					success: true,
-					data: results
-				});
-			} else {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 }).toArray()
-				return res.status(200).json({
-					success: true,
-					data: results
-				});
-			}
-		} else {
-			if (!result.data.searchTSFrom) {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap).toArray()
-				return res.status(200).json({
-					success: true,
-					data: results
-				});
-			} else {
-				const results = await heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": result.data.searchTSFrom } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap).toArray()
-				return res.status(200).json({
-					success: true,
-					data: results
-				});
-			}
-		}
+		const results = await query.toArray()
+		return res.status(200).json({
+			success: true,
+			data: results
+		});
 	} catch (e) {
 		return res.status(500).json({ success: false, error: "Server Database Failure." })
 	}
