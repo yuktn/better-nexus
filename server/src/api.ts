@@ -15,8 +15,10 @@ import crypto from 'node:crypto';
 import { writeFile, readFile } from "node:fs/promises";
 import { generateSecret, generate, verify, generateURI } from "otplib";
 
-import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
+import { initDb, heartbeats, enrollmentTokens, agents } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
+import type { REPLCommand } from 'node:repl';
+import { platform } from 'node:os';
 
 export const api = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
@@ -32,6 +34,56 @@ api.get('/health', (_req: Request, res: Response) => {
 });
 
 //#region /agents
+
+api.get('/agents', async (_req: Request, res: Response) => {
+	let agentList: Agent[] | undefined;
+
+	try {
+		agentList = await agents.find().toArray()
+	} catch (e) {
+		return res.status(500).json({ success: false, error: "Unknown database error" })
+	}
+
+	const data = agentList.map(item => {
+		return {
+			agentId: item.agentId,
+			agentName: item.agentName,
+			agentNexusVersion: item.agentNexusVersion,
+			platform: item.platform,
+			registeredOn: item.registeredOn,
+			lastSeenOn: item.lastSeenOn,
+		};
+	});
+
+	return res.status(200).json({ success: true, data })
+})
+
+api.get('/agents/:id', async (_req: Request, res: Response) => {
+	const id = _req.params.id
+
+	let agent
+
+	try {
+		agent = await agents.findOne({ agentId: id })
+
+		if (!agent) {
+			return res.status(404).json({ success: false, error: "Not Found" })
+		}
+	} catch (e) {
+		return res.status(500).json({ success: false, error: "Unknown database error" })
+	}
+
+	const data = {
+		agentId: agent.agentId,
+		agentName: agent.agentName,
+		agentNexusVersion: agent.agentNexusVersion,
+		platform: agent.platform,
+		registeredOn: agent.registeredOn,
+		lastSeenOn: agent.lastSeenOn,
+	};
+
+	return res.status(200).json({ success: true, data })
+})
 
 //requires token from /server/register!
 api.post('/agents', async (_req: Request, res: Response) => {
