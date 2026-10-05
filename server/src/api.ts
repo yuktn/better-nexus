@@ -306,9 +306,11 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 
 			return res.status(201).json({
 				success: true,
-				data: { hb: {
-					...hb, timestamp: hb.timestamp.getTime()
-				}, id },
+				data: {
+					hb: {
+						...hb, timestamp: hb.timestamp.getTime()
+					}, id
+				},
 			});
 		} else {
 			res.status(500).json({ success: false, error: "Server Database Failure." })
@@ -319,36 +321,126 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 })
 
 //get timestamp based on count, start or finish.
-//GET /hb/abc123?searchTSFrom=123&searchTSTo=456&hbCountCap=100
-api.get('/hb/:id', async (_req: Request, res: Response) => {
-	const agentId = _req.params.id
+//GET /hb/abc123?searchTSFrom=123&searchTSTo=456&hbCountCap=100&range=1M
 
-	const result = HeartbeatRequestSchema.safeParse(_req.query)
+const RANGE_CONFIG = {
+	"1M": {
+		durationMs: 60 * 1000,
+		unit: "second",
+		binSize: 5,
+	},
+	"1H": {
+		durationMs: 60 * 60 * 1000,
+		unit: "minute",
+		binSize: 1,
+	},
+	"1D": {
+		durationMs: 24 * 60 * 60 * 1000,
+		unit: "minute",
+		binSize: 10,
+	},
+	"1W": {
+		durationMs: 7 * 24 * 60 * 60 * 1000,
+		unit: "hour",
+		binSize: 1,
+	},
+} as const;
+
+
+api.get('/hb/:id', async (_req: Request, res: Response) => {
+	const agentId = _req.params.id;
+
+	const result = HeartbeatRequestSchema.safeParse(_req.query);
 
 	if (!result.success) {
 		return res.status(400).json({
 			success: false,
-			error: `Bad Request.`,
+			error: "Bad Request.",
 		});
 	}
 
-
-	const tsTo = new Date(result.data.searchTSTo ?? Date.now())
-
-	const tsFrom = new Date(result.data.searchTSFrom ?? 0)
-
-	//TODO: THIS AMOUNT OF NESTED IFS ARE NOT NORMAL. ROBERT C MARTIN IS COMING. -- FIXED!!!!
-
-	//ok.. lets think shall we
-	//if no hbCountCap: time is larger than searchTSFrom and smaller than searchTSTo
-	//i guess make searchTSFrom to 0 when it doesnt exist?
-
-	//im just goated look at this astra, qwen, fable im coming for you get ready
-
-	const query = result.data.hbCountCap ? heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": tsFrom } }).sort({ timestamp: -1 }).limit(result.data.hbCountCap) : heartbeats.find({ agentId, timestamp: { "$lte": tsTo, "$gte": tsFrom } }).sort({ timestamp: -1 })
-
 	try {
-		const results = await query.toArray()
+		// range = aggregate mode
+		if (result.data.range) {
+			const config = RANGE_CONFIG[result.data.range];
+
+			const tsTo = new Date();
+			const tsFrom = new Date(
+				tsTo.getTime() - config.durationMs
+			);
+
+			const results = await heartbeats.aggregate([
+				{
+					$match: {
+						agentId,
+						timestamp: {
+							$gte: tsFrom,
+							$lte: tsTo,
+						},
+					},
+				},
+				{
+					$group: {
+						_id: {
+							$dateTrunc: {
+								date: "$timestamp",
+								unit: config.unit,
+								binSize: config.binSize,
+							},
+						},
+
+						cpu: { $avg: "$cpu" },
+						memory: { $avg: "$memory" },
+						temp: { $avg: "$temp" },
+
+						samples: { $sum: 1 },
+					},
+				},
+				{
+					$sort: {
+						_id: 1,
+					},
+				},
+			]).toArray();
+
+			const data = results.map(hb => ({
+				timestamp: hb._id.getTime(),
+				cpu: hb.cpu,
+				memory: hb.memory,
+				temp: hb.temp,
+				samples: hb.samples,
+			}));
+
+			return res.status(200).json({
+				success: true,
+				data,
+			});
+		}
+
+		// no range -> raw data
+		const tsTo = new Date(
+			result.data.searchTSTo ?? Date.now()
+		);
+
+		const tsFrom = new Date(
+			result.data.searchTSFrom ?? 0
+		);
+
+		let query = heartbeats
+			.find({
+				agentId,
+				timestamp: {
+					$gte: tsFrom,
+					$lte: tsTo,
+				},
+			})
+			.sort({ timestamp: -1 });
+
+		if (result.data.hbCountCap) {
+			query = query.limit(result.data.hbCountCap);
+		}
+
+		const results = await query.toArray();
 
 		const data = results.map(hb => ({
 			...hb,
@@ -357,9 +449,13 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 
 		return res.status(200).json({
 			success: true,
-			data // change to ms!~!
+			data,
 		});
+
 	} catch (e) {
-		return res.status(500).json({ success: false, error: "Server Database Failure." })
+		return res.status(500).json({
+			success: false,
+			error: "Server Database Failure.",
+		});
 	}
-})
+});

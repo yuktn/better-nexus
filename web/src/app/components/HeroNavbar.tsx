@@ -3,9 +3,37 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import nexusPlusLogo from "./nexus-plus-logo.svg";
-import nexusPlusLogoCompact from "./nexus-plus-square.svg"
+import nexusPlusOrange from "./nexus-plus-orange.svg";
+import nexusPlusRed from "./nexus-plus-red.svg";
 
-export default function HeroNavbar() {
+const healthStates = {
+  operational: {
+    firstLine: "All Systems",
+    secondLine: "Operational",
+    label: "Operational",
+    color: "text-nexus-blue",
+    logo: nexusPlusLogo,
+  },
+  partial: {
+    firstLine: "Partial",
+    secondLine: "Outage",
+    label: "Partial outage",
+    color: "text-nexus-yellow",
+    logo: nexusPlusOrange,
+  },
+  critical: {
+    firstLine: "Critical",
+    secondLine: "Outage",
+    label: "Critical outage",
+    color: "text-nexus-red",
+    logo: nexusPlusRed,
+  },
+} as const;
+
+export type HeroStatus = keyof typeof healthStates;
+
+export default function HeroNavbar({ status = "operational" }: { status?: HeroStatus }) {
+  const health = healthStates[status];
   const sentinelRef = useRef<HTMLDivElement>(null);
   const [isCompact, setIsCompact] = useState(false);
 
@@ -23,8 +51,11 @@ export default function HeroNavbar() {
   }, []);
 
   return (
-    // Keep the hero's space reserved when its content becomes viewport-fixed.
-    <section aria-labelledby="hero-title" className="relative min-h-svh w-full">
+    <section aria-labelledby="hero-title" className="relative w-full shrink-0">
+      {/* Reserve the full title height, including wrapping, in both header modes. */}
+      <div aria-hidden="true" className="invisible break-words py-12 text-4xl font-semibold tracking-tight sm:text-7xl">
+        {health.firstLine} <span className="block">{health.secondLine}</span>
+      </div>
       <div ref={sentinelRef} aria-hidden="true" className="pointer-events-none absolute left-0 top-0 h-px w-px" />
       <header
         className={
@@ -36,39 +67,38 @@ export default function HeroNavbar() {
         <div
           className={`mx-auto flex w-full max-w-5xl gap-6 ${
             isCompact
-              ? "items-center justify-between px-4 py-4 sm:px-8"
+              ? "items-center justify-between px-6 py-3 sm:px-16"
               : "flex-col items-start py-12"
           }`}
         >
           <div className="min-w-0">
             <h1
               id="hero-title"
-              className={`relative min-h-8 font-semibold tracking-tight text-zinc-950 transition-[font-size] duration-300 ease-in-out motion-reduce:transition-none dark:text-zinc-50 ${
-                isCompact ? "text-lg sm:text-xl" : "break-words text-4xl sm:text-6xl"
-              }`}
+              className={`relative min-h-8 break-words text-4xl font-semjbold tracking-tight text-zinc-950 sm:text-7xl dark:text-zinc-50 ${isCompact ? "h-8" : ""}`}
             >
               <span
-                className={`block origin-top-left overflow-hidden transition-[transform,opacity,max-height] duration-300 ease-in-out motion-reduce:transition-none ${
+                className={`block origin-top-left transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
                   isCompact
-                    ? "max-h-8 scale-75 opacity-0"
-                    : "max-h-96 scale-100 opacity-100"
+                    ? "pointer-events-none translate-y-12 opacity-0"
+                    : "translate-y-0 opacity-100"
                 }`}
               >
-                All Systems <span className="text-[#3C57F0]">Operational</span>
+                {health.firstLine} <span className={`block ${health.color} font-bold`}>{health.secondLine}</span>
               </span>
               <Image
-                src={nexusPlusLogo}
+                src={health.logo}
                 alt="nexus+"
                 aria-hidden={!isCompact}
-                className={`pointer-events-none absolute left-0 top-0 h-8 w-auto origin-left transition-[transform,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
-                  isCompact ? "scale-100 opacity-100" : "scale-90 opacity-0"
+                className={`pointer-events-none absolute left-0 top-0 h-8 w-auto origin-left transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
+                  isCompact ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
                 }`}
               />
             </h1>
           </div>
-          <nav aria-label="Main navigation" className="shrink-0">
+          <nav aria-label="Main navigation" className={isCompact ? "shrink-0" : "hidden"}>
             <button
               type="button"
+              aria-label={`${health.firstLine} ${health.secondLine}. Back to top`}
               onClick={() =>
                 window.scrollTo({
                   top: 0,
@@ -77,11 +107,11 @@ export default function HeroNavbar() {
                     : "smooth",
                 })
               }
-              className={`rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-800 transition-colors hover:bg-zinc-100 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-zinc-500 dark:border-zinc-700 dark:text-zinc-200 dark:hover:bg-zinc-900 ${
+              className={`py-2 text-sm font-medium ${health.color} transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${
                 isCompact ? "" : "hidden"
               }`}
             >
-              Back to top
+              {health.label}
             </button>
           </nav>
         </div>

@@ -68,10 +68,21 @@ export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
 
 // all are coerced to numbers because queries are passed as strings.
 export const HeartbeatRequestSchema = z.object({
-  hbCountCap: z.coerce.number().int().positive().optional(), // defaults to no counts
-  searchTSTo: z.coerce.number().optional(),// utim, defaults to first hb
-  searchTSFrom: z.coerce.number().optional(), //utim, defaults to date.now
-})
+	searchTSFrom: z.coerce.number().optional(),
+	searchTSTo: z.coerce.number().optional(),
+	hbCountCap: z.coerce.number().int().positive().optional(),
+
+	range: z.enum(["1M", "1H", "1D", "1W"]).optional(),
+}).refine(
+	data =>
+		!(
+			data.range &&
+			(data.searchTSFrom !== undefined || data.searchTSTo !== undefined)
+		),
+	{
+		message: "range cannot be combined with searchTSFrom/searchTSTo",
+	}
+);
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>
 

@@ -29,6 +29,11 @@ export async function initDb() {
     agentId: 1,
     timestamp: -1,
   });
+
+  await heartbeats.createIndex(
+  { timestamp: 1 },
+  { expireAfterSeconds: 60 * 60 * 24 * 7 }
+);
   
   await enrollmentTokens.createIndex(
     { hashedEnrollmentToken: 1 },
