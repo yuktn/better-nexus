@@ -8,7 +8,7 @@ const agentListSchema = z.object({
   data: z.array(AgentSchema.pick({
     agentId: true, agentName: true, agentNexusVersion: true,
     platform: true, registeredOn: true, lastSeenOn: true,
-  })),
+  }).extend({ status: z.enum(["UP", "DEGRADED", "DOWN"]).optional() })),
 });
 const heartbeatListSchema = z.object({ success: z.literal(true), data: z.array(HeartbeatSchema) });
 

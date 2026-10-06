@@ -65,7 +65,7 @@ export type AgentHistoryRequest = {
 export type AgentCardProps = {
   /** Omit all data props to display a labeled design preview. */
   agent?: Pick<Agent, "agentId" | "agentName" | "agentNexusVersion">;
-  status?: "up" | "down" | "unknown";
+  status?: "up" | "degraded" | "down" | "unknown";
   /** Update this prop as new live heartbeats arrive. */
   latestHeartbeat?: Heartbeat | null;
   /** Raw or server-downsampled samples, with timestamps in milliseconds. */
@@ -82,12 +82,13 @@ function formatValue(value: number | undefined, metric: Metric) {
     : "—";
 }
 
-function HistoryGraph({ samples, metric, from, to, timeZone }: {
+function HistoryGraph({ samples, metric, from, to, timeZone, colorClass }: {
   samples: readonly Heartbeat[];
   metric: Metric;
   from: number;
   to: number;
   timeZone: string;
+  colorClass: string;
 }) {
   const points = samples
     .filter((sample) => Number.isFinite(sample.timestamp) && Number.isFinite(sample[metric]) && sample.timestamp >= from && sample.timestamp <= to)
@@ -123,8 +124,8 @@ function HistoryGraph({ samples, metric, from, to, timeZone }: {
             <text x="40" y={24 + fraction * 240} textAnchor="end" fill="currentColor" className="text-[11px] text-zinc-500">{Math.round(max - fraction * (max - min))}{metric === "temp" ? "°" : "%"}</text>
           </g>
         ))}
-        <path d={path} fill="none" stroke="var(--color-nexus-blue)" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        {points.length === 1 && <circle cx={x(points[0].timestamp)} cy={y(points[0][metric])} r="3" fill="var(--color-nexus-blue)" />}
+        <path d={path} className={colorClass} fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+        {points.length === 1 && <circle className={colorClass} cx={x(points[0].timestamp)} cy={y(points[0][metric])} r="3" fill="currentColor" />}
         {[from, (from + to) / 2, to].map((timestamp, index) => (
           <text key={index} x={x(timestamp)} y="288" textAnchor={index === 0 ? "start" : index === 2 ? "end" : "middle"} fill="currentColor" className="text-[11px] text-zinc-500">{timeLabel(timestamp)}</text>
         ))}
@@ -188,8 +189,10 @@ export default function AgentCard(props: AgentCardProps = {}) {
   const to = loadHistory ? Math.max(result?.to ?? 0, liveHistory[liveHistory.length - 1]?.timestamp ?? 0) : Math.max(latestHeartbeat?.timestamp ?? 0, newest?.timestamp ?? 0);
   const loading = Boolean(loadHistory && !result);
   const error = Boolean(loadHistory && result?.error);
-  const statusLabel = status === "up" ? "UP" : status === "down" ? "DOWN" : "—";
-  const choiceClass = (selected: boolean) => `border-b-2 px-2 py-2 text-xs font-semibold tracking-wider transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-nexus-blue motion-reduce:transition-none ${selected ? "border-nexus-blue text-nexus-blue" : "border-transparent text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-100"}`;
+  const statusLabel = status === "unknown" ? "—" : status.toUpperCase();
+  const statusColor = status === "up" ? "text-nexus-blue" : status === "degraded" ? "text-nexus-yellow" : status === "down" ? "text-nexus-red" : "text-zinc-500";
+  const statusSize = status === "degraded" ? "text-lg sm:text-3xl" : "text-3xl sm:text-5xl";
+  const choiceClass = (selected: boolean) => `border-b-2 px-2 py-2 text-xs font-semibold tracking-wider transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current motion-reduce:transition-none ${selected ? `border-current ${statusColor}` : "border-transparent text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-100"}`;
 
   return (
     <article aria-labelledby={titleId} aria-label={isDemo ? "Demo agent preview" : undefined} className="w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-950 dark:border-zinc-800 dark:bg-black dark:text-zinc-50">
@@ -202,9 +205,10 @@ export default function AgentCard(props: AgentCardProps = {}) {
           <span title={agent.agentId} className="min-w-0 truncate text-zinc-500"><span className="sr-only">Agent ID: </span>{agent.agentId}</span>
           <span className="shrink-0">v{agent.agentNexusVersion.replace(/^v/, "")}</span>
         </div>
-        <span aria-hidden={expanded} className={`pointer-events-none absolute right-6 top-5 text-3xl font-black leading-none tracking-tighter transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none sm:right-8 sm:top-6 sm:text-5xl ${status === "up" ? "text-nexus-blue" : "text-zinc-500"} ${expanded ? "translate-y-12 opacity-0" : "translate-y-0 opacity-100"}`}>{statusLabel}</span>
+        <span aria-hidden="true" className={`pointer-events-none invisible col-start-2 row-start-1 row-span-2 font-black leading-none tracking-tighter ${statusSize} ${expanded ? "hidden" : ""}`}>{statusLabel}</span>
+        <span aria-hidden={expanded} className={`pointer-events-none absolute right-6 top-5 font-black leading-none tracking-tighter transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none sm:right-8 sm:top-6 ${statusSize} ${statusColor} ${expanded ? "translate-y-12 opacity-0" : "translate-y-0 opacity-100"}`}>{statusLabel}</span>
         <dl aria-hidden={!expanded} className={`pointer-events-none relative col-start-2 row-start-1 row-span-3 grid grid-rows-subgrid text-lg leading-none transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none sm:text-xl ${expanded ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"}`}>
-          {metrics.map((item) => <div key={item} className="flex min-h-0 items-center justify-between gap-3 overflow-hidden sm:gap-6"><dt className="text-zinc-500">{labels[item]}</dt><dd className="text-right font-semibold tabular-nums text-nexus-blue">{formatValue(live?.[item], item)}</dd></div>)}
+          {metrics.map((item) => <div key={item} className="flex min-h-0 items-center justify-between gap-3 overflow-hidden sm:gap-6"><dt className="text-zinc-500">{labels[item]}</dt><dd className={`text-right font-semibold tabular-nums ${statusColor}`}>{formatValue(live?.[item], item)}</dd></div>)}
         </dl>
       </div>
 
@@ -220,7 +224,7 @@ export default function AgentCard(props: AgentCardProps = {}) {
               </div>
             </div>
             <div aria-busy={loading}>
-              {loading || error ? <div role="status" className="flex h-72 items-center justify-center text-sm text-zinc-500 sm:h-80">{error ? "History unavailable. Reopen the card to retry." : "Loading history…"}</div> : <HistoryGraph samples={samples} metric={metric} from={to - ranges[range]} to={to} timeZone={timeZone} />}
+              {loading || error ? <div role="status" className="flex h-72 items-center justify-center text-sm text-zinc-500 sm:h-80">{error ? "History unavailable. Reopen the card to retry." : "Loading history…"}</div> : <HistoryGraph samples={samples} metric={metric} from={to - ranges[range]} to={to} timeZone={timeZone} colorClass={statusColor} />}
             </div>
             <p className="mt-1 text-right text-[10px] tracking-wide text-zinc-400">{isDemo ? `DEMO DATA · ${timeZone}` : timeZone}</p>
           </div>

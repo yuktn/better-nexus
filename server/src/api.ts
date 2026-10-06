@@ -17,8 +17,7 @@ import { generateSecret, generate, verify, generateURI } from "otplib";
 
 import { initDb, heartbeats, enrollmentTokens, agents } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
-import type { REPLCommand } from 'node:repl';
-import { platform } from 'node:os';
+import { statusManager } from './statusManager.js';
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
 
 export const api = express();
@@ -53,6 +52,7 @@ api.get('/agents', async (_req: Request, res: Response) => {
 			platform: item.platform,
 			registeredOn: item.registeredOn,
 			lastSeenOn: item.lastSeenOn,
+			status: item.status
 		};
 	});
 
@@ -306,6 +306,7 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 		const result = await heartbeats.insertOne(hb)
 		
 		sendSseEvent('heartbeat', hb)
+		statusManager.onHeartbeat(agentId, {temp, cpu, memory, timestamp} )
 
 		if (result.insertedId && lastSeenOnUpdate.matchedCount === 1) {
 			const id = result.insertedId

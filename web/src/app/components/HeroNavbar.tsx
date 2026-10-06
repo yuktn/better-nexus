@@ -7,6 +7,13 @@ import nexusPlusOrange from "./nexus-plus-orange.svg";
 import nexusPlusRed from "./nexus-plus-red.svg";
 
 const healthStates = {
+  unknown: {
+    firstLine: "System Status",
+    secondLine: "Unknown",
+    label: "Status unknown",
+    color: "text-zinc-500",
+    logo: nexusPlusLogo,
+  },
   operational: {
     firstLine: "All Systems",
     secondLine: "Operational",

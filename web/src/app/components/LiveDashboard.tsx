@@ -7,7 +7,12 @@ import type { DashboardSnapshot } from "@/lib/nexus";
 import HeroNavbar, { type HeroStatus } from "./HeroNavbar";
 import ConnectedAgentCard from "./ConnectedAgentCard";
 
-const STALE_AFTER_MS = 30_000;
+const statusChangeSchema = z.object({
+  agentId: z.uuidv4(),
+  newStatus: z.enum(["UP", "DEGRADED", "DOWN"]),
+  timestamp: z.union([z.number().int(), z.iso.datetime().transform((value) => Date.parse(value))]),
+});
+const cardStatuses = { UP: "up", DEGRADED: "degraded", DOWN: "down" } as const;
 const eventSchema = HeartbeatSchema.extend({
   agentId: z.uuidv4(),
   timestamp: z.union([z.number().int(), z.iso.datetime().transform((value) => Date.parse(value))]),
@@ -20,7 +25,7 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
   const [cards, setCards] = useState(initialSnapshot.cards);
   const [failed, setFailed] = useState(initialFailed);
   const [connection, setConnection] = useState<"connecting" | "live" | "reconnecting">("connecting");
-  const [now, setNow] = useState(initialSnapshot.snapshotAt);
+  const [statuses, setStatuses] = useState<Record<string, z.infer<typeof statusChangeSchema>>>({});
   const [liveHistory, setLiveHistory] = useState<Record<string, Heartbeat[]>>({});
 
   useEffect(() => {
@@ -71,7 +76,6 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       if (!parsed.success) return;
       const { agentId, ...heartbeat } = parsed.data;
       const receivedAt = Date.now();
-      setNow(receivedAt);
       setCards((current) => current.map((card) => card.agent.agentId !== agentId ? card : {
         ...card,
         agent: { ...card.agent, lastSeenOn: receivedAt },
@@ -86,23 +90,39 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       if (!knownAgents.has(agentId)) void syncSnapshot();
     });
 
-    // Expire silent agents even when no new events arrive.
-    const clock = setInterval(() => {
-      setNow(Date.now());
+    events.addEventListener("statusChange", (event) => {
+      let parsed;
+      try { parsed = statusChangeSchema.safeParse(JSON.parse((event as MessageEvent).data)); } catch { return; }
+      if (!parsed.success) return;
+      const change = parsed.data;
+      setStatuses((current) => {
+        const previous = current[change.agentId];
+        if (previous && previous.timestamp > change.timestamp) return current;
+        return { ...current, [change.agentId]: change };
+      });
+      if (!knownAgents.has(change.agentId)) void syncSnapshot();
+    });
+
+    // Retry failed snapshots only; agent health is owned by the server.
+    const retryTimer = setInterval(() => {
       if (retrySnapshot) void syncSnapshot();
     }, 5_000);
     return () => {
       controller.abort();
       events.close();
-      clearInterval(clock);
+      clearInterval(retryTimer);
     };
   }, [initialSnapshot]);
 
-  const downCount = cards.filter((card) => now - card.agent.lastSeenOn > STALE_AFTER_MS).length;
-  const health: HeroStatus = (failed && cards.length === 0) || (cards.length > 0 && downCount === cards.length)
+  const getStatus = (agent: DashboardSnapshot["cards"][number]["agent"]) =>
+    statuses[agent.agentId]?.newStatus ?? agent.status;
+  const downCount = cards.filter((card) => getStatus(card.agent) === "DOWN").length;
+  const health: HeroStatus = cards.length > 0 && downCount === cards.length
     ? "critical"
-    : failed || connection === "reconnecting" || downCount > 0 || cards.some((card) => card.telemetryFailed)
-      ? "partial" : "operational";
+    : downCount > 0 || cards.some((card) => getStatus(card.agent) === "DEGRADED")
+      ? "partial"
+      : failed || cards.some((card) => !getStatus(card.agent))
+        ? "unknown" : "operational";
 
   return (
     <>
@@ -115,7 +135,7 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
         {cards.length === 0 ? (
           <p role="status" className="w-full rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500 dark:border-zinc-800">{failed ? "Unable to load agents. Retrying the connection." : "No agents registered yet."}</p>
         ) : cards.map(({ agent, latestHeartbeat }) => (
-          <ConnectedAgentCard key={agent.agentId} agent={agent} status={now - agent.lastSeenOn <= STALE_AFTER_MS ? "up" : "down"} latestHeartbeat={latestHeartbeat} liveHistory={liveHistory[agent.agentId]} />
+          <ConnectedAgentCard key={agent.agentId} agent={agent} status={getStatus(agent) ? cardStatuses[getStatus(agent)!] : "unknown"} latestHeartbeat={latestHeartbeat} liveHistory={liveHistory[agent.agentId]} />
         ))}
       </div>
     </>

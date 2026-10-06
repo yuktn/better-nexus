@@ -1,5 +1,11 @@
 import { z } from "zod";
 
+export const StatusSchema = z.enum(["UP", "DEGRADED", "DOWN"]);
+export const ReasonSchema = z.enum(["TEMP_HI", "CPU_HI", "MEM_HI", "TIMEOUT"]);
+
+export type Status = z.infer<typeof StatusSchema>;
+export type Reason = z.infer<typeof ReasonSchema>;
+
 export const HeartbeatSchema = z.object({
   temp: z.number(), // Celsius
   cpu: z.number().min(0).max(100), // Percentage
@@ -34,14 +40,14 @@ export const AgentSchema = z.object({
   registeredOn: z.number().int(), // U t i m
   lastSeenOn: z.number().int(), // Unix timestamp in milliseconds
   sourceIP: z.string(), // ipv4 or ipv6, supply by server
-  ipType: z.enum(["ipv4", "ipv6"])
+  ipType: z.enum(["ipv4", "ipv6"]),
+  status: StatusSchema
 })
 
 export type Agent = z.infer<typeof AgentSchema>;
 
 export const AgentDocumentSchema = AgentSchema.extend({
   hashedAgentSecret: z.string(),
-  status: z.enum(["UP", "DEGRADED", "DOWN"])
 })
 
 export type AgentDocument = z.infer<typeof AgentDocumentSchema>
@@ -101,3 +107,12 @@ export const AgentInfoSchema = AgentSchema.pick({
 });
 
 export type AgentInfo = z.infer<typeof AgentInfoSchema>;
+
+export const AgentStatusChangeSchema = z.object({
+  agentId: z.string(),
+  newStatus: StatusSchema,
+  reason: ReasonSchema.optional(),
+  timestamp: z.date()
+})
+
+export type AgentStatusChange = z.infer<typeof AgentStatusChangeSchema>;
