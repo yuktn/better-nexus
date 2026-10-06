@@ -4,7 +4,9 @@
   <img src="./docs/nexus-plus-logo.svg" alt="better nexus logo" width="400">
 </p>
 
-better-nexus is an enhanced version of [nexus](https://github.com/yuktn/nexus), and is a easily hostable and extendable device status monitoring project written in TypeScript.
+better-nexus is an enhanced version of [nexus](https://github.com/yuktn/nexus), and is a easily hostable and extendable device status monitoring project written in TypeScript.  
+
+For v0.1.0, only linux is supported. Mac and Windows is to be expected in v0.2.0 if things go as planned.
 
 For a tutorial on setting it up on your own server, check Run locally.
 

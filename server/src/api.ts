@@ -139,6 +139,8 @@ api.post('/agents', async (_req: Request, res: Response) => {
 
 	const currentTime: number = Date.now() // = registeredOn, = lastSeenOn
 
+	//add status
+
 	const agent: AgentDocument = {
 		agentId,
 		agentName,
@@ -148,7 +150,8 @@ api.post('/agents', async (_req: Request, res: Response) => {
 		lastSeenOn: currentTime,
 		sourceIP: agentIP,
 		ipType,
-		hashedAgentSecret
+		hashedAgentSecret,
+		status: "UP" // TODO: add status manager + watchdog
 	}
 
 	try {

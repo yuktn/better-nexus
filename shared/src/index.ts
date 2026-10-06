@@ -39,9 +39,12 @@ export const AgentSchema = z.object({
 
 export type Agent = z.infer<typeof AgentSchema>;
 
-export type AgentDocument = Agent & {
-  hashedAgentSecret: string;
-};
+export const AgentDocumentSchema = AgentSchema.extend({
+  hashedAgentSecret: z.string(),
+  status: z.enum(["UP", "DEGRADED", "DOWN"])
+})
+
+export type AgentDocument = z.infer<typeof AgentDocumentSchema>
 
 export const AgentRegisterRequestSchema = z.object({
   agentName: z.string(),

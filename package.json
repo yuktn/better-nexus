@@ -11,7 +11,7 @@
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "dev:agent": "npm run dev -w agent",
-    "build": "npm run build --workspaces --if-present"
+    "build": "npm run build -w shared && npm run build -w server && npm run build -w agent && npm run build -w web"
   },
   "dependencies": {
     "express": "^5.2.1"

@@ -83,7 +83,7 @@ export default function HeroNavbar({ status = "operational" }: { status?: HeroSt
                     : "translate-y-0 opacity-100"
                 }`}
               >
-                {health.firstLine} <span className={`block ${health.color} font-bold`}>{health.secondLine}</span>
+                <span className={`font-light`}>{health.firstLine}</span> <span className={`block ${health.color} font-bold`}>{health.secondLine}</span>
               </span>
               <Image
                 src={health.logo}
@@ -107,7 +107,7 @@ export default function HeroNavbar({ status = "operational" }: { status?: HeroSt
                     : "smooth",
                 })
               }
-              className={`py-2 text-sm font-medium ${health.color} transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${
+              className={`py-2 text-xl font-medium ${health.color} transition-opacity hover:opacity-70 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${
                 isCompact ? "" : "hidden"
               }`}
             >
