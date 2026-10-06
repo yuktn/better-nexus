@@ -5,7 +5,7 @@ set -Eeuo pipefail
 VERSION="${NEXUS_VERSION:-v0.1.0}"
 REPO="https://github.com/yuktn/better-nexus.git"
 
-INSTALL_DIR="/opt/better-nexus"
+INSTALL_DIR="/opt/better-nexus-server"
 
 SERVER_CONFIG_DIR="/etc/better-nexus/server"
 SERVER_ENV="/etc/better-nexus/server.env"
@@ -19,14 +19,7 @@ SERVER_COMMAND="/usr/local/bin/nexus-server"
 NEXUS_USER="nexus"
 NEXUS_GROUP="nexus"
 
-# Can be overridden:
-#
-#   MONGODB_URI='mongodb://...' curl ... | sudo -E bash
-#
-# Normally localhost is exactly what we want.
 MONGODB_URI="${MONGODB_URI:-mongodb://127.0.0.1:27017}"
-
-# Web and Nexus server are installed together by this script.
 NEXUS_SERVER_URL="${NEXUS_SERVER_URL:-http://127.0.0.1:8081}"
 
 info() {
@@ -39,16 +32,20 @@ die() {
 }
 
 if [[ "${EUID}" -ne 0 ]]; then
-  die "Run this installer as root (for example: curl ... | sudo bash)."
+  die "Run this installer as root."
 fi
 
-for command in git node npm systemctl; do
+for command in git node npm systemctl runuser; do
   command -v "$command" >/dev/null 2>&1 ||
     die "'$command' is required but was not found."
 done
 
+NODE_BIN="$(command -v node)"
+NPM_BIN="$(command -v npm)"
+
 if ! node -e '
   const [major, minor] = process.versions.node.split(".").map(Number);
+
   process.exit(
     major > 20 || (major === 20 && minor >= 9)
       ? 0
@@ -79,7 +76,7 @@ if ! id "$NEXUS_USER" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# Build release
+# Download/build
 # ---------------------------------------------------------------------------
 
 TMP_DIR="$(mktemp -d)"
@@ -105,6 +102,8 @@ npm ci
 
 info "Building Better Nexus"
 npm run build
+
+info "Installing application"
 
 rm -rf "$INSTALL_DIR"
 mv "$TMP_DIR/repo" "$INSTALL_DIR"
@@ -136,24 +135,25 @@ chmod 640 "$SERVER_ENV" "$WEB_ENV"
 # nexus-server command
 # ---------------------------------------------------------------------------
 
-cat > "$SERVER_COMMAND" <<'EOF'
+cat > "$SERVER_COMMAND" <<EOF
 #!/usr/bin/env bash
-set -e
 
-cd /etc/better-nexus/server
+set -Eeuo pipefail
 
-exec /usr/bin/node \
-  /opt/better-nexus/server/dist/cli/index.js \
-  "$@"
+export NEXUS_CONFIG_DIR="${SERVER_CONFIG_DIR}"
+
+exec "${NODE_BIN}" \
+  "${INSTALL_DIR}/server/dist/cli/index.js" \
+  "\$@"
 EOF
 
 chmod 755 "$SERVER_COMMAND"
 
 # ---------------------------------------------------------------------------
-# Server systemd unit
+# nexus-server systemd unit
 # ---------------------------------------------------------------------------
 
-cat > "$SERVER_SERVICE" <<'EOF'
+cat > "$SERVER_SERVICE" <<EOF
 [Unit]
 Description=Better Nexus Server
 Documentation=https://github.com/yuktn/better-nexus
@@ -163,13 +163,15 @@ Wants=network-online.target
 [Service]
 Type=simple
 
-User=nexus
-Group=nexus
+User=${NEXUS_USER}
+Group=${NEXUS_GROUP}
 
-WorkingDirectory=/etc/better-nexus/server
-EnvironmentFile=/etc/better-nexus/server.env
+WorkingDirectory=${SERVER_CONFIG_DIR}
 
-ExecStart=/usr/local/bin/nexus-server start
+EnvironmentFile=${SERVER_ENV}
+Environment=NEXUS_CONFIG_DIR=${SERVER_CONFIG_DIR}
+
+ExecStart=${SERVER_COMMAND} start
 
 Restart=always
 RestartSec=5
@@ -182,10 +184,10 @@ WantedBy=multi-user.target
 EOF
 
 # ---------------------------------------------------------------------------
-# Web systemd unit
+# nexus-web systemd unit
 # ---------------------------------------------------------------------------
 
-cat > "$WEB_SERVICE" <<'EOF'
+cat > "$WEB_SERVICE" <<EOF
 [Unit]
 Description=Better Nexus Web Dashboard
 Documentation=https://github.com/yuktn/better-nexus
@@ -196,13 +198,14 @@ Requires=nexus-server.service
 [Service]
 Type=simple
 
-User=nexus
-Group=nexus
+User=${NEXUS_USER}
+Group=${NEXUS_GROUP}
 
-WorkingDirectory=/opt/better-nexus/web
-EnvironmentFile=/etc/better-nexus/web.env
+WorkingDirectory=${INSTALL_DIR}/web
 
-ExecStart=/usr/bin/npm start
+EnvironmentFile=${WEB_ENV}
+
+ExecStart=${NPM_BIN} start
 
 Restart=always
 RestartSec=5
@@ -217,42 +220,49 @@ EOF
 systemctl daemon-reload
 
 # ---------------------------------------------------------------------------
-# Initial TOTP setup
+# Initial server/TOTP setup
 # ---------------------------------------------------------------------------
 
 if [[ ! -f "$SERVER_CONFIG_DIR/server.token" ]]; then
-  info "Starting Nexus server setup."
+  info "Starting Nexus server setup"
 
   echo
-  echo "Your authenticator QR code will be shown now."
+  echo "Scan the QR code with your authenticator."
   echo
 
-  "$SERVER_COMMAND" setup </dev/tty >/dev/tty
+  runuser -u "$NEXUS_USER" -- \
+    "$SERVER_COMMAND" setup \
+    </dev/tty >/dev/tty
 
-  chown -R "$NEXUS_USER:$NEXUS_GROUP" "$SERVER_CONFIG_DIR"
-  chmod 700 "$SERVER_CONFIG_DIR"
+  if [[ ! -f "$SERVER_CONFIG_DIR/server.token" ]]; then
+    die "Server setup did not create server.token."
+  fi
 
-  [[ -f "$SERVER_CONFIG_DIR/server.token" ]] &&
-    chmod 600 "$SERVER_CONFIG_DIR/server.token"
+  chown "$NEXUS_USER:$NEXUS_GROUP" \
+    "$SERVER_CONFIG_DIR/server.token"
+
+  chmod 600 \
+    "$SERVER_CONFIG_DIR/server.token"
 else
-  info "Existing server credentials found; keeping them."
+  info "Existing server credentials found; keeping them"
 fi
 
 # ---------------------------------------------------------------------------
-# Start
+# Start/restart server
 # ---------------------------------------------------------------------------
 
 info "Starting Nexus Server"
-systemctl enable --now nexus-server.service
 
-# Give systemd a moment to determine whether it immediately crashed.
+systemctl enable nexus-server.service
+systemctl restart nexus-server.service
+
 sleep 1
 
 if ! systemctl is-active --quiet nexus-server.service; then
   echo
   echo "Nexus Server failed to start."
   echo
-  echo "The most likely cause is that MongoDB is unavailable at:"
+  echo "MongoDB URI:"
   echo "  ${MONGODB_URI}"
   echo
   echo "Logs:"
@@ -260,18 +270,43 @@ if ! systemctl is-active --quiet nexus-server.service; then
   exit 1
 fi
 
+# ---------------------------------------------------------------------------
+# Start/restart web
+# ---------------------------------------------------------------------------
+
 info "Starting Nexus Web"
-systemctl enable --now nexus-web.service
+
+systemctl enable nexus-web.service
+systemctl restart nexus-web.service
+
+sleep 1
+
+if ! systemctl is-active --quiet nexus-web.service; then
+  echo
+  echo "Nexus Web failed to start."
+  echo
+  echo "Logs:"
+  echo "  journalctl -u nexus-web -n 50"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
 
 echo
 echo "Better Nexus Server ${VERSION} installed."
 echo
-echo "API:       http://<this-machine>:8081"
-echo "Admin API: http://127.0.0.1:8082"
-echo "Web:       http://<this-machine>:3000"
+echo "API:"
+echo "  http://<this-machine>:8081"
 echo
-echo "Enroll a new agent with:"
+echo "Admin API:"
+echo "  http://127.0.0.1:8082"
 echo
+echo "Web:"
+echo "  http://<this-machine>:3000"
+echo
+echo "Enroll a new agent:"
 echo "  sudo nexus-server enroll"
 echo
 echo "Useful commands:"

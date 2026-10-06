@@ -46,7 +46,7 @@ try {
 
 } catch (e) {
     cancel('error while enrolling: ' + e);
-    process.exit(0);
+    process.exit(1);
 }
 
 outro(`See you next time...`);

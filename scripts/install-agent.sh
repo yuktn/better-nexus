@@ -5,8 +5,10 @@ set -Eeuo pipefail
 VERSION="${NEXUS_VERSION:-v0.1.0}"
 REPO="https://github.com/yuktn/better-nexus.git"
 
-INSTALL_DIR="/opt/better-nexus"
+INSTALL_DIR="/opt/better-nexus-agent"
+
 CONFIG_DIR="/etc/better-nexus/agent"
+
 SERVICE_FILE="/etc/systemd/system/nexus-agent.service"
 COMMAND_FILE="/usr/local/bin/nexus-agent"
 
@@ -23,18 +25,19 @@ die() {
 }
 
 if [[ "${EUID}" -ne 0 ]]; then
-  die "Run this installer as root (for example: curl ... | sudo bash)."
+  die "Run this installer as root."
 fi
 
-for command in git node npm systemctl; do
+for command in git node npm systemctl runuser; do
   command -v "$command" >/dev/null 2>&1 ||
     die "'$command' is required but was not found."
 done
 
-# Next.js isn't used by the agent itself, but the monorepo tooling targets
-# modern Node. Keep the supported baseline simple for v0.1.
+NODE_BIN="$(command -v node)"
+
 if ! node -e '
   const [major, minor] = process.versions.node.split(".").map(Number);
+
   process.exit(
     major > 20 || (major === 20 && minor >= 9)
       ? 0
@@ -65,7 +68,7 @@ if ! id "$NEXUS_USER" >/dev/null 2>&1; then
 fi
 
 # ---------------------------------------------------------------------------
-# Build release
+# Download/build
 # ---------------------------------------------------------------------------
 
 TMP_DIR="$(mktemp -d)"
@@ -89,18 +92,20 @@ cd "$TMP_DIR/repo"
 info "Installing dependencies"
 npm ci
 
-info "Building shared package and agent"
+info "Building Better Nexus Agent"
+
 npm run build -w shared
 npm run build -w agent
 
-# Replace only application code. Persistent configuration is in /etc.
+info "Installing application"
+
 rm -rf "$INSTALL_DIR"
 mv "$TMP_DIR/repo" "$INSTALL_DIR"
 
 chown -R root:root "$INSTALL_DIR"
 
 # ---------------------------------------------------------------------------
-# Configuration directory
+# Configuration
 # ---------------------------------------------------------------------------
 
 mkdir -p "$CONFIG_DIR"
@@ -112,24 +117,25 @@ chmod 700 "$CONFIG_DIR"
 # nexus-agent command
 # ---------------------------------------------------------------------------
 
-cat > "$COMMAND_FILE" <<'EOF'
+cat > "$COMMAND_FILE" <<EOF
 #!/usr/bin/env bash
-set -e
 
-cd /etc/better-nexus/agent
+set -Eeuo pipefail
 
-exec /usr/bin/node \
-  /opt/better-nexus/agent/dist/cli/index.js \
-  "$@"
+export NEXUS_CONFIG_DIR="${CONFIG_DIR}"
+
+exec "${NODE_BIN}" \
+  "${INSTALL_DIR}/agent/dist/cli/index.js" \
+  "\$@"
 EOF
 
 chmod 755 "$COMMAND_FILE"
 
 # ---------------------------------------------------------------------------
-# systemd
+# systemd unit
 # ---------------------------------------------------------------------------
 
-cat > "$SERVICE_FILE" <<'EOF'
+cat > "$SERVICE_FILE" <<EOF
 [Unit]
 Description=Better Nexus Agent
 Documentation=https://github.com/yuktn/better-nexus
@@ -139,12 +145,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 
-User=nexus
-Group=nexus
+User=${NEXUS_USER}
+Group=${NEXUS_GROUP}
 
-WorkingDirectory=/etc/better-nexus/agent
+WorkingDirectory=${CONFIG_DIR}
 
-ExecStart=/usr/local/bin/nexus-agent start
+Environment=NEXUS_CONFIG_DIR=${CONFIG_DIR}
+
+ExecStart=${COMMAND_FILE} start
 
 Restart=always
 RestartSec=5
@@ -159,48 +167,73 @@ EOF
 systemctl daemon-reload
 
 # ---------------------------------------------------------------------------
-# Enrollment
+# Initial enrollment
 # ---------------------------------------------------------------------------
 
-info "Agent binaries installed."
-
 if [[ ! -f "$CONFIG_DIR/config.json" || ! -f "$CONFIG_DIR/agent.token" ]]; then
-  info "Starting agent setup."
+  info "Starting Nexus Agent setup"
 
   echo
   echo "You will need:"
-  echo "  1. The URL of your Nexus server"
-  echo "  2. An enrollment token from 'sudo nexus-server enroll'"
+  echo "  - your Nexus server URL"
+  echo "  - a fresh enrollment token from 'sudo nexus-server enroll'"
   echo
 
-  # Explicit /dev/tty makes interactive prompts work even when this installer
-  # itself is executed through: curl ... | sudo bash
-  "$COMMAND_FILE" setup </dev/tty >/dev/tty
+  runuser -u "$NEXUS_USER" -- \
+    "$COMMAND_FILE" setup \
+    </dev/tty >/dev/tty
 
-  chown -R "$NEXUS_USER:$NEXUS_GROUP" "$CONFIG_DIR"
-  chmod 700 "$CONFIG_DIR"
+  # Do not trust the CLI exit code alone.
+  # v0.1 development versions previously returned exit 0 on setup failure.
+  if [[ ! -f "$CONFIG_DIR/config.json" ]]; then
+    die "Agent setup failed: config.json was not created."
+  fi
 
-  [[ -f "$CONFIG_DIR/agent.token" ]] &&
-    chmod 600 "$CONFIG_DIR/agent.token"
+  if [[ ! -f "$CONFIG_DIR/agent.token" ]]; then
+    die "Agent setup failed: agent.token was not created."
+  fi
 
-  [[ -f "$CONFIG_DIR/config.json" ]] &&
-    chmod 600 "$CONFIG_DIR/config.json"
+  chown \
+    "$NEXUS_USER:$NEXUS_GROUP" \
+    "$CONFIG_DIR/config.json" \
+    "$CONFIG_DIR/agent.token"
+
+  chmod 600 \
+    "$CONFIG_DIR/config.json" \
+    "$CONFIG_DIR/agent.token"
 else
-  info "Existing agent configuration found; keeping it."
+  info "Existing agent configuration found; keeping it"
 fi
 
 # ---------------------------------------------------------------------------
-# Start
+# Start/restart
 # ---------------------------------------------------------------------------
 
-info "Enabling Nexus Agent"
-systemctl enable --now nexus-agent.service
+info "Starting Nexus Agent"
+
+systemctl enable nexus-agent.service
+systemctl restart nexus-agent.service
+
+sleep 1
+
+if ! systemctl is-active --quiet nexus-agent.service; then
+  echo
+  echo "Nexus Agent failed to start."
+  echo
+  echo "Logs:"
+  echo "  journalctl -u nexus-agent -n 50"
+  exit 1
+fi
+
+# ---------------------------------------------------------------------------
+# Done
+# ---------------------------------------------------------------------------
 
 echo
 echo "Better Nexus Agent ${VERSION} installed."
 echo
-echo "Commands:"
-echo "  nexus-agent edit"
+echo "Useful commands:"
+echo "  sudo nexus-agent edit"
 echo "  systemctl status nexus-agent"
 echo "  journalctl -u nexus-agent -f"
 echo

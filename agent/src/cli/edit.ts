@@ -33,12 +33,12 @@ try {
         serverUrl = config.serverUrl;
     } catch (e) {
         cancel('no agent credentials - run setup!')
-        process.exit(0)
+        process.exit(1)
     }
 
     if (!agentId || !agentSecret || !agentName) {
         cancel('no agent credentials - run setup!')
-        process.exit(0)
+        process.exit(1)
     }
 
     const field = await select({
@@ -51,7 +51,7 @@ try {
 
     if (isCancel(field)) {
         cancel('SIGINT');
-        process.exit(0);
+        process.exit(1);
     }
 
     //for only local changes
@@ -62,7 +62,7 @@ try {
 
         if (isCancel(newValue)) {
             cancel('SIGINT')
-            process.exit(0)
+            process.exit(1)
         }
 
         try {
@@ -95,7 +95,7 @@ try {
 
     if (isCancel(newValue)) {
         cancel('SIGINT')
-        process.exit(0)
+        process.exit(1)
     }
 
     const req: AgentUpdateRequest = {
@@ -117,7 +117,7 @@ try {
 
     if (!response.ok) {
         cancel('error while editing');
-        process.exit(0);
+        process.exit(1);
     }
 
 
@@ -150,7 +150,7 @@ try {
 
 } catch (e) {
     cancel('error while enrolling: ' + e);
-    process.exit(0);
+    process.exit(1);
 }
 
 outro(`See you next time...`);

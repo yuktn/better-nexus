@@ -19,7 +19,7 @@ try {
 
         if (isCancel(serverUrl)) {
             cancel('SIGINT');
-            process.exit(0);
+            process.exit(1);
         }
 
         try {
@@ -65,7 +65,7 @@ try {
 
     if (isCancel(token)) {
         cancel('SIGINT');
-        process.exit(0);
+        process.exit(1);
     }
 
     const osPlatform = process.platform;
@@ -80,14 +80,14 @@ try {
         platPh = "Linux"
     } else {
         cancel('unsupported platform: ' + osPlatform);
-        process.exit(0);
+        process.exit(1);
     }
 
     const agentName = await text({ message: 'what is the name of your agent?' })
 
     if (isCancel(agentName)) {
         cancel('SIGINT');
-        process.exit(0);
+        process.exit(1);
     }
 
     const platform = await select({
@@ -101,7 +101,7 @@ try {
 
     if (isCancel(platform)) {
         cancel('SIGINT');
-        process.exit(0);
+        process.exit(1);
     }
 
     const request: AgentRegisterRequest = {
@@ -162,7 +162,7 @@ try {
     );
 } catch (e) {
     cancel('error while enrolling: ' + e);
-    process.exit(0);
+    process.exit(1);
 }
 
 outro(`See you next time...`);
