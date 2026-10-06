@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-export const StatusSchema = z.enum(["UP", "DEGRADED", "DOWN"]);
-export const ReasonSchema = z.enum(["TEMP_HI", "CPU_HI", "MEM_HI", "TIMEOUT"]);
+export const StatusSchema = z.enum({ UP: "UP", DEGRADED: "DEGRADED", DOWN: "DOWN" } as const);
+export const ReasonSchema = z.enum({ TEMP_HI: "TEMP_HI", CPU_HI: "CPU_HI", MEM_HI: "MEM_HI", TIMEOUT: "TIMEOUT" } as const);
+export const PlatformSchema = z.enum({ windows: "windows", mac: "mac", linux: "linux" } as const);
 
 export type Status = z.infer<typeof StatusSchema>;
 export type Reason = z.infer<typeof ReasonSchema>;
@@ -36,11 +37,11 @@ export const AgentSchema = z.object({
   agentId: z.uuidv4(), // UUIDv4
   agentName: z.string(), // set by agent
   agentNexusVersion: z.string(),
-  platform: z.enum(["windows", "mac", "linux"]),
+  platform: PlatformSchema,
   registeredOn: z.number().int(), // U t i m
   lastSeenOn: z.number().int(), // Unix timestamp in milliseconds
   sourceIP: z.string(), // ipv4 or ipv6, supply by server
-  ipType: z.enum(["ipv4", "ipv6"]),
+  ipType: z.enum({ ipv4: "ipv4", ipv6: "ipv6" } as const),
   status: StatusSchema
 })
 
@@ -55,7 +56,7 @@ export type AgentDocument = z.infer<typeof AgentDocumentSchema>
 export const AgentRegisterRequestSchema = z.object({
   agentName: z.string(),
   agentNexusVersion: z.string(),
-  platform: z.enum(["windows", "mac", "linux"]),
+  platform: PlatformSchema,
 })
 
 export type AgentRegisterRequest = z.infer<typeof AgentRegisterRequestSchema>;
@@ -81,7 +82,7 @@ export const HeartbeatRequestSchema = z.object({
 	searchTSTo: z.coerce.number().optional(),
 	hbCountCap: z.coerce.number().int().positive().optional(),
 
-	range: z.enum(["1M", "1H", "1D", "1W"]).optional(),
+	range: z.enum({ "1M": "1M", "1H": "1H", "1D": "1D", "1W": "1W" } as const).optional(),
 }).refine(
 	data =>
 		!(
