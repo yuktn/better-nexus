@@ -31,7 +31,7 @@ The server and web is installed in the same folder and is run in the same file.
 Run:
 
 ```bash
-curl -fsSL https://nexus.yuktn.com/install/server | sudo bash
+curl -fsSL https://nexus.yuktn.dev/install/server | sudo bash
 ```
 
 Follow the instructions, and you're done!  
@@ -44,7 +44,7 @@ Follow the instructions, and you're done!
 Run:
 
 ```bash
-curl -fsSL https://nexus.yuktn.com/install/agent | sudo bash
+curl -fsSL https://nexus.yuktn.dev/install/agent | sudo bash
 ```
 
 Follow the instructions, and you're done!  
