@@ -6,7 +6,7 @@
 
 better-nexus is an enhanced version of [nexus](https://github.com/yuktn/nexus), and is a easily hostable anr modular device status monitoring project written in TypeScript.
 
-It can be self-hosted very easily, check Run locally.
+For a tutorial on setting it up on your own server, check Run locally.
 
 Originally, nexus was planned to be a project for everyone to use, but was scrapped due to the volume of the project exceeding my skills. [legacynexus](https://github.com/yuktn/legacynexus)  
 While the original nexus did support self hosting, it is a tedious task, and I consider it to not being made *for* self hosting purposes.
