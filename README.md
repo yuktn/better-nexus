@@ -4,15 +4,16 @@
   <img src="./docs/nexus-plus-logo.svg" alt="better nexus logo" width="400">
 </p>
 
-better-nexus is an enhanced project of [nexus](https://github.com/yuktn/nexus), and is a device status monitoring project written in TypeScript.
+better-nexus is an enhanced version of [nexus](https://github.com/yuktn/nexus), and is a easily hostable anr modular device status monitoring project written in TypeScript.
 
-It can be self-hosted very easily, check #Host better-nexus on your server.
+It can be self-hosted very easily, check Run locally.
 
 Originally, nexus was planned to be a project for everyone to use, but was scrapped due to the volume of the project exceeding my skills. [legacynexus](https://github.com/yuktn/legacynexus)  
+While the original nexus did support self hosting, it is a tedious task, and I consider it to not being made *for* self hosting purposes.
 
 After learning and gaining more experience, I am trying to tackle this project once more in the right way this time, hopefully.
 
-## Host better-nexus on your server
+## Run locally
 wip
 ### Server
 
@@ -25,4 +26,4 @@ wip
 
 There was minimal use of AI in the backend (server/agent). All the logic, types, zod, db configuration was done by myself.  
 
-The frontend was assisted with AI, but was not fully done by it.
+The frontend was designed by myself, but the implementation had substantial use of ai.
