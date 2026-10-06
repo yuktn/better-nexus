@@ -12,6 +12,6 @@ async function loadHistory({ agentId, range, signal }: AgentHistoryRequest) {
   return historyResponse.parse(await response.json()).data;
 }
 
-export default function ConnectedAgentCard(props: Pick<AgentCardProps, "agent" | "status" | "latestHeartbeat">) {
+export default function ConnectedAgentCard(props: Pick<AgentCardProps, "agent" | "status" | "latestHeartbeat" | "liveHistory">) {
   return <AgentCard {...props} loadHistory={loadHistory} />;
 }

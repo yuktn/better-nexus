@@ -19,6 +19,7 @@ import { initDb, heartbeats, enrollmentTokens, agents } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
 import type { REPLCommand } from 'node:repl';
 import { platform } from 'node:os';
+import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
 
 export const api = express();
 const port = process.env.PORT ? Number(process.env.PORT) : 8081;
@@ -300,6 +301,8 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 	try {
 		const lastSeenOnUpdate = await agents.updateOne({ agentId }, { $set: { lastSeenOn: Date.now() } })
 		const result = await heartbeats.insertOne(hb)
+		
+		sendSseEvent('heartbeat', hb)
 
 		if (result.insertedId && lastSeenOnUpdate.matchedCount === 1) {
 			const id = result.insertedId
@@ -458,4 +461,23 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 			error: "Server Database Failure.",
 		});
 	}
+});
+
+//SSE for frontend
+api.get('/events', (_req, res) => {
+	res.setHeader('Content-Type', 'text/event-stream');
+	res.setHeader('Cache-Control', 'no-cache, no-transform');
+	res.setHeader('X-Accel-Buffering', 'no');
+	res.setHeader('Connection', 'keep-alive');
+	res.flushHeaders();
+
+	res.write('data: Connected to the nexus api!\n\n');
+
+	addSseClient(res)
+	const keepAlive = setInterval(() => res.write(": keep-alive\n\n"), 15_000);
+
+	res.on("close", () => {
+		clearInterval(keepAlive);
+		removeSseClient(res);
+	});
 });

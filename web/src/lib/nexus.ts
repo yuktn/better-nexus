@@ -12,12 +12,16 @@ const agentListSchema = z.object({
 });
 const heartbeatListSchema = z.object({ success: z.literal(true), data: z.array(HeartbeatSchema) });
 
-async function request(path: string) {
+export function nexusUrl(path: string) {
   const base = process.env.NEXUS_SERVER_URL;
   if (!base) throw new Error("NEXUS_SERVER_URL is not configured.");
   const url = new URL(`${base.replace(/\/$/, "")}/${path}`);
   if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("NEXUS_SERVER_URL must use HTTP or HTTPS.");
-  const response = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(10_000) });
+  return url;
+}
+
+async function request(path: string) {
+  const response = await fetch(nexusUrl(path), { cache: "no-store", signal: AbortSignal.timeout(10_000) });
   if (!response.ok) throw new Error(`Nexus request failed (${response.status}).`);
   return response.json();
 }
@@ -33,3 +37,17 @@ export async function getLatestHeartbeat(agentId: string) {
 export async function getHistory(agentId: string, range: "1M" | "1H" | "1D" | "1W") {
   return heartbeatListSchema.parse(await request(`hb/${encodeURIComponent(agentId)}?range=${range}`)).data;
 }
+
+export async function getDashboardSnapshot() {
+  const agents = await getAgents();
+  const cards = await Promise.all(agents.map(async (agent) => {
+    try {
+      return { agent, latestHeartbeat: await getLatestHeartbeat(agent.agentId), telemetryFailed: false };
+    } catch {
+      return { agent, latestHeartbeat: null, telemetryFailed: true };
+    }
+  }));
+  return { cards, snapshotAt: Date.now() };
+}
+
+export type DashboardSnapshot = Awaited<ReturnType<typeof getDashboardSnapshot>>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, useSyncExternalStore } from "react";
 import type { Agent, Heartbeat } from "@better-nexus/shared";
 
 const metrics = ["cpu", "memory", "temp"] as const;
@@ -15,6 +15,16 @@ const ranges: Record<AgentTimeRange, number> = {
 };
 const labels: Record<Metric, string> = { cpu: "CPU", memory: "MEM", temp: "TEMP" };
 const EMPTY_HISTORY: readonly Heartbeat[] = [];
+
+const subscribeToTimezone = () => () => {};
+const serverTimezone = () => "UTC";
+function clientTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  } catch {
+    return "UTC";
+  }
+}
 
 // Fixed sample data keeps the design preview identical across server and client.
 const DEMO_AGENT = {
@@ -60,6 +70,8 @@ export type AgentCardProps = {
   latestHeartbeat?: Heartbeat | null;
   /** Raw or server-downsampled samples, with timestamps in milliseconds. */
   history?: readonly Heartbeat[];
+  /** Recent SSE samples; merged after the historical snapshot. */
+  liveHistory?: readonly Heartbeat[];
   /** Optional loader for the complete selected window. Keep its reference stable. */
   loadHistory?: (request: AgentHistoryRequest) => Promise<readonly Heartbeat[]>;
 };
@@ -70,11 +82,12 @@ function formatValue(value: number | undefined, metric: Metric) {
     : "—";
 }
 
-function HistoryGraph({ samples, metric, from, to }: {
+function HistoryGraph({ samples, metric, from, to, timeZone }: {
   samples: readonly Heartbeat[];
   metric: Metric;
   from: number;
   to: number;
+  timeZone: string;
 }) {
   const points = samples
     .filter((sample) => Number.isFinite(sample.timestamp) && Number.isFinite(sample[metric]) && sample.timestamp >= from && sample.timestamp <= to)
@@ -89,18 +102,21 @@ function HistoryGraph({ samples, metric, from, to }: {
   const x = (timestamp: number) => 52 + ((timestamp - from) / (to - from)) * 824;
   const y = (value: number) => 260 - ((value - min) / (max - min)) * 240;
   const path = points.map((point, index) => `${index === 0 ? "M" : "L"}${x(point.timestamp)},${y(point[metric])}`).join(" ");
-  const timeLabel = (timestamp: number) => {
-    const date = new Date(timestamp);
-    return to - from >= ranges["1D"]
-      ? date.toISOString().slice(5, 16).replace("T", " ")
-      : date.toISOString().slice(11, to - from <= ranges["1M"] ? 19 : 16);
-  };
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    hourCycle: "h23",
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(to - from >= ranges["1D"] ? { month: "2-digit", day: "2-digit" } as const : {}),
+    ...(to - from <= ranges["1M"] ? { second: "2-digit" } as const : {}),
+  });
+  const timeLabel = (timestamp: number) => formatter.format(timestamp);
 
   return (
     <div className="overflow-x-auto">
-      <svg viewBox="0 0 900 300" role="img" aria-label={`${labels[metric]} history, ${points.length} samples. Times in UTC.`} className="h-72 w-full min-w-[480px] sm:h-80">
+      <svg viewBox="0 0 900 300" role="img" aria-label={`${labels[metric]} history, ${points.length} samples. Times in ${timeZone}.`} className="h-72 w-full min-w-[480px] sm:h-80">
         <title>{`${labels[metric]} history`}</title>
-        <desc>{points.length} samples from {new Date(from).toISOString()} to {new Date(to).toISOString()}. Latest plotted value: {formatValue(points[points.length - 1][metric], metric)}.</desc>
+        <desc>{`${points.length} samples from ${timeLabel(from)} to ${timeLabel(to)} (${timeZone}). Latest plotted value: ${formatValue(points[points.length - 1][metric], metric)}.`}</desc>
         {[0, 0.5, 1].map((fraction) => (
           <g key={fraction}>
             <line x1="52" x2="876" y1={20 + fraction * 240} y2={20 + fraction * 240} stroke="currentColor" className="text-zinc-200 dark:text-zinc-800" />
@@ -118,11 +134,17 @@ function HistoryGraph({ samples, metric, from, to }: {
 }
 
 export default function AgentCard(props: AgentCardProps = {}) {
-  const isDemo = props.agent === undefined && props.status === undefined && props.latestHeartbeat === undefined && props.history === undefined && props.loadHistory === undefined;
+  // Start with UTC during hydration, then use this client's timezone.
+  const timeZone = useSyncExternalStore(subscribeToTimezone, clientTimezone, serverTimezone);
+  const isDemo = props.agent === undefined && props.status === undefined && props.latestHeartbeat === undefined && props.history === undefined && props.liveHistory === undefined && props.loadHistory === undefined;
   const agent = props.agent ?? (isDemo ? DEMO_AGENT : { agentId: "", agentName: "Unknown agent", agentNexusVersion: "unknown" });
   const status = props.status ?? (isDemo ? "up" : "unknown");
   const latestHeartbeat = isDemo ? DEMO_LATEST : props.latestHeartbeat;
   const loadHistory = props.loadHistory;
+  const liveHistory = props.liveHistory ?? EMPTY_HISTORY;
+  // Reconcile live samples with server-downsampled history every 30 seconds
+  // while receiving events, without fetching on every heartbeat.
+  const historyRevision = Math.floor((liveHistory[liveHistory.length - 1]?.timestamp ?? 0) / 30_000);
   const [expanded, setExpanded] = useState(false);
   const [metric, setMetric] = useState<Metric>("cpu");
   const [range, setRange] = useState<AgentTimeRange>("1M");
@@ -155,13 +177,15 @@ export default function AgentCard(props: AgentCardProps = {}) {
     return () => {
       controller.abort();
     };
-  }, [expanded, loadHistory, agent.agentId, range]);
+  }, [expanded, loadHistory, agent.agentId, range, historyRevision]);
 
   const result = remote?.agentId === agent.agentId && remote.range === range ? remote : null;
-  const samples = loadHistory ? result?.samples ?? EMPTY_HISTORY : history;
+  const historicalSamples = loadHistory ? result?.samples ?? EMPTY_HISTORY : history;
+  const historicalEnd = loadHistory ? result?.to ?? 0 : historicalSamples.reduce((end, sample) => Math.max(end, sample.timestamp), 0);
+  const samples = [...historicalSamples, ...liveHistory.filter((sample) => sample.timestamp > historicalEnd)];
   const newest = samples.reduce<Heartbeat | undefined>((latest, sample) => !latest || sample.timestamp > latest.timestamp ? sample : latest, undefined);
   const live = latestHeartbeat;
-  const to = loadHistory ? result?.to ?? 0 : Math.max(latestHeartbeat?.timestamp ?? 0, newest?.timestamp ?? 0);
+  const to = loadHistory ? Math.max(result?.to ?? 0, liveHistory[liveHistory.length - 1]?.timestamp ?? 0) : Math.max(latestHeartbeat?.timestamp ?? 0, newest?.timestamp ?? 0);
   const loading = Boolean(loadHistory && !result);
   const error = Boolean(loadHistory && result?.error);
   const statusLabel = status === "up" ? "UP" : status === "down" ? "DOWN" : "—";
@@ -196,9 +220,9 @@ export default function AgentCard(props: AgentCardProps = {}) {
               </div>
             </div>
             <div aria-busy={loading}>
-              {loading || error ? <div role="status" className="flex h-72 items-center justify-center text-sm text-zinc-500 sm:h-80">{error ? "History unavailable. Reopen the card to retry." : "Loading history…"}</div> : <HistoryGraph samples={samples} metric={metric} from={to - ranges[range]} to={to} />}
+              {loading || error ? <div role="status" className="flex h-72 items-center justify-center text-sm text-zinc-500 sm:h-80">{error ? "History unavailable. Reopen the card to retry." : "Loading history…"}</div> : <HistoryGraph samples={samples} metric={metric} from={to - ranges[range]} to={to} timeZone={timeZone} />}
             </div>
-            <p className="mt-1 text-right text-[10px] tracking-wide text-zinc-400">{isDemo ? "DEMO DATA · UTC" : "UTC"}</p>
+            <p className="mt-1 text-right text-[10px] tracking-wide text-zinc-400">{isDemo ? `DEMO DATA · ${timeZone}` : timeZone}</p>
           </div>
         </div>
       </div>
