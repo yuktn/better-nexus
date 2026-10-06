@@ -1,3 +1,4 @@
+import { tokenPath } from "./config.js";
 import express, { type Request, type Response } from 'express';
 import {
     type Heartbeat, HeartbeatSchema,
@@ -37,7 +38,7 @@ admin.get('/health', (_req: Request, res: Response) => {
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
 admin.post('/admin/register', async (_req: Request, res: Response) => {
 
-    const secretContent = await readFile("./server.token", "utf8");
+    const secretContent = await readFile(tokenPath, "utf8");
 
     const secret = secretContent.trim()
 

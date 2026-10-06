@@ -1,3 +1,4 @@
+import { configPath, tokenPath } from "../config.js";
 import { intro, cancel, text, outro, log, spinner, select, isCancel } from '@clack/prompts';
 import { writeFile, readFile } from "node:fs/promises";
 import {
@@ -20,8 +21,8 @@ try {
     let serverUrl: string | undefined
 
     try {
-        const fileContent = await readFile("./config.json", "utf8");
-        const secretContent = await readFile("./agent.token", "utf8");
+        const fileContent = await readFile(configPath, "utf8");
+        const secretContent = await readFile(tokenPath, "utf8");
         const config = JSON.parse(fileContent);
 
         agentSecret = secretContent.trim();
@@ -65,7 +66,7 @@ try {
         }
 
         try {
-            const fileContent = await readFile("./config.json", "utf8");
+            const fileContent = await readFile(configPath, "utf8");
 
             const config = AgentInfoSchema.parse(JSON.parse(fileContent));
 
@@ -75,7 +76,7 @@ try {
             });
 
             await writeFile(
-                "./config.json",
+                configPath,
                 JSON.stringify(newConfig, null, 2),
                 "utf8"
             );
@@ -123,7 +124,7 @@ try {
     const data = await response.json()
 
     try {
-        const fileContent = await readFile("./config.json", "utf8");
+        const fileContent = await readFile(configPath, "utf8");
 
         const config = AgentInfoSchema.parse(JSON.parse(fileContent));
 
@@ -133,7 +134,7 @@ try {
         }); //spread, spread, spread. data.data.data.
 
         await writeFile(
-            "./config.json",
+            configPath,
             JSON.stringify(newConfig, null, 2),
             "utf8"
         );

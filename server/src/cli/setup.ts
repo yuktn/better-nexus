@@ -1,6 +1,7 @@
+import { configDir, tokenPath } from "../config.js";
 import { intro, cancel, outro, log, spinner } from '@clack/prompts';
 import { generateSecret, generate, verify, generateURI } from "otplib";
-import { writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import encodeQR from 'qr';
 
 const s = spinner();
@@ -8,6 +9,7 @@ const s = spinner();
 intro(`setup your nexus main server`);
 
 try {
+    await mkdir(configDir, { recursive: true });
 
     log.message('Welcome to nexus!')
 
@@ -28,7 +30,7 @@ try {
     });
 
     await writeFile(
-        "./server.token",
+        tokenPath,
         secret,
         {
             encoding: "utf8",

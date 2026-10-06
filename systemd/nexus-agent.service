@@ -1,0 +1,22 @@
+[Unit]
+Description=Better Nexus Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=nexus
+Group=nexus
+
+WorkingDirectory=/opt/better-nexus
+
+Environment=NEXUS_CONFIG_DIR=/etc/better-nexus/agent
+
+ExecStart=/usr/bin/node /opt/better-nexus/agent/dist/index.js
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

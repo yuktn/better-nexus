@@ -1,0 +1,22 @@
+[Unit]
+Description=Better Nexus Web
+After=network-online.target nexus-server.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=nexus
+Group=nexus
+
+WorkingDirectory=/opt/better-nexus/web
+
+EnvironmentFile=-/etc/better-nexus/web.env
+
+ExecStart=/usr/bin/npm start
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

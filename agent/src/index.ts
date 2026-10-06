@@ -1,3 +1,4 @@
+import { configPath, tokenPath } from "./config.js";
 import { writeFile, readFile } from "node:fs/promises";
 import si, { cpuFlags } from 'systeminformation';
 import {
@@ -31,8 +32,8 @@ let agentName: string | undefined;
 let serverUrl: string | undefined;
 
 try {
-    const fileContent = await readFile("./config.json", "utf8");
-    const secretContent = await readFile("./agent.token", "utf8");
+    const fileContent = await readFile(configPath, "utf8");
+    const secretContent = await readFile(tokenPath, "utf8");
     const config = JSON.parse(fileContent);
 
     agentSecret = secretContent.trim();

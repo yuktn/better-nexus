@@ -1,0 +1,23 @@
+[Unit]
+Description=Better Nexus Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+User=nexus
+Group=nexus
+
+WorkingDirectory=/opt/better-nexus
+
+Environment=NEXUS_CONFIG_DIR=/etc/better-nexus/server
+EnvironmentFile=-/etc/better-nexus/server.env
+
+ExecStart=/usr/bin/node /opt/better-nexus/server/dist/index.js
+
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

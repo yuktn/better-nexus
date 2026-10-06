@@ -1,5 +1,6 @@
+import { configDir, configPath, tokenPath } from "../config.js";
 import { intro, cancel, text, outro, log, spinner, select, isCancel } from '@clack/prompts';
-import { writeFile, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readFile } from "node:fs/promises";
 import {
     type AgentRegisterRequest, AgentRegisterRequestSchema,
     type AgentInfo, AgentInfoSchema,
@@ -10,6 +11,7 @@ const s = spinner();
 intro(`setup your nexus agent`);
 
 try {
+    await mkdir(configDir, { recursive: true });
     let serverUrl;
 
     while (true) {
@@ -145,13 +147,13 @@ try {
 
 
     await writeFile(
-        "./config.json",
+        configPath,
         JSON.stringify(agentInfo, null, 2),
         "utf8"
     );
 
     await writeFile(
-        "./agent.token",
+        tokenPath,
         agentSecret,
         {
             encoding: "utf8",
