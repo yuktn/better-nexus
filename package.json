@@ -1,6 +1,7 @@
 {
   "name": "better-nexus",
   "private": true,
+  "version": "0.1.0",
   "workspaces": [
     "server",
     "web",

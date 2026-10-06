@@ -13,7 +13,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@better-nexus/shared": "workspace:*",
+    "@better-nexus/shared": "0.1.0",
     "@clack/prompts": "^1.8.1",
     "express": "^5.2.1",
     "mongodb": "^7.7.0",
