@@ -6,6 +6,8 @@
 
 ## Release 0.1.0 is live!
 
+Visit [better nexus](https://nexus.yuktn.dev) to see better-nexus in action!
+
 better-nexus is an enhanced version of [nexus](https://github.com/yuktn/nexus), and is a easily hostable and extendable device status monitoring project written in TypeScript.  
 
 For v0.1.0, only linux is supported. Mac and Windows is to be expected in v0.2.0 if things go as planned.
