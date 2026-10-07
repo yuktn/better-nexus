@@ -1,5 +1,5 @@
 import { MongoClient } from "mongodb";
-import { type Agent, type HeartbeatDocument, type AgentDocument, type EnrollmentToken, type AgentStatusChange } from "@better-nexus/shared";
+import { type Agent, type HeartbeatDocument, type AgentDocument, type EnrollmentToken, type AgentStatusChange, type Incident } from "@better-nexus/shared";
 
 const uri =
   process.env.MONGODB_URI ??
@@ -7,7 +7,7 @@ const uri =
 
 const client = new MongoClient(uri);
 
-const db = client.db("better-nexus");
+const db = client.db(process.env.NODE_ENV === "development" ? "better-nexus-dev" : "better-nexus");
 
 export const agents = db.collection<AgentDocument>("agents");
 
@@ -16,6 +16,8 @@ export const heartbeats = db.collection<HeartbeatDocument>("heartbeats");
 export const enrollmentTokens = db.collection<EnrollmentToken>("enrollmenttokens")
 
 export const agentStatusChanges = db.collection<AgentStatusChange>("agentStatusChanges")
+
+export const incidents = db.collection<Incident>("incidents")
 
 export async function initDb() {
   await client.connect();

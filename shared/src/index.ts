@@ -78,20 +78,20 @@ export type AgentUpdateRequest = z.infer<typeof AgentUpdateRequestSchema>
 
 // all are coerced to numbers because queries are passed as strings.
 export const HeartbeatRequestSchema = z.object({
-	searchTSFrom: z.coerce.number().optional(),
-	searchTSTo: z.coerce.number().optional(),
-	hbCountCap: z.coerce.number().int().positive().optional(),
+  searchTSFrom: z.coerce.number().optional(),
+  searchTSTo: z.coerce.number().optional(),
+  hbCountCap: z.coerce.number().int().positive().optional(),
 
-	range: z.enum({ "1M": "1M", "1H": "1H", "1D": "1D", "1W": "1W" } as const).optional(),
+  range: z.enum({ "1M": "1M", "1H": "1H", "1D": "1D", "1W": "1W" } as const).optional(),
 }).refine(
-	data =>
-		!(
-			data.range &&
-			(data.searchTSFrom !== undefined || data.searchTSTo !== undefined)
-		),
-	{
-		message: "range cannot be combined with searchTSFrom/searchTSTo",
-	}
+  data =>
+    !(
+      data.range &&
+      (data.searchTSFrom !== undefined || data.searchTSTo !== undefined)
+    ),
+  {
+    message: "range cannot be combined with searchTSFrom/searchTSTo",
+  }
 );
 
 export type HeartbeatRequest = z.infer<typeof HeartbeatRequestSchema>
@@ -117,3 +117,40 @@ export const AgentStatusChangeSchema = z.object({
 })
 
 export type AgentStatusChange = z.infer<typeof AgentStatusChangeSchema>;
+
+export const IncidentStatusSchema = z.enum([
+  "open",
+  "resolved",
+]);
+
+export type IncidentStatus = z.infer<typeof IncidentStatusSchema>;
+
+export const IncidentSeveritySchema = z.enum([
+  "DEGRADED",
+  "DOWN",
+]);
+
+export type IncidentSeverity = z.infer<typeof IncidentSeveritySchema>;
+
+export const IncidentReasonSchema = ReasonSchema
+
+export type IncidentReason = z.infer<typeof IncidentReasonSchema>;
+
+export const IncidentSchema = z.object({
+  incidentId: z.uuid(),
+  agentId: z.uuid(),
+
+  status: IncidentStatusSchema,
+  severity: IncidentSeveritySchema,
+  reason: IncidentReasonSchema,
+
+  startedAt: z.date(),
+  resolvedAt: z.date().nullable(),
+
+  message: z.string(),
+
+  createdAt: z.date(),
+  updatedAt: z.date(),
+});
+
+export type Incident = z.infer<typeof IncidentSchema>;

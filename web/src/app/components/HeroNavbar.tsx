@@ -118,7 +118,7 @@ export default function HeroNavbar({ status = "operational" }: { status?: HeroSt
                 isCompact ? "" : "hidden"
               }`}
             >
-              PREVIEW BUILD {health.label}
+              {health.label}
             </button>
           </nav>
         </div>

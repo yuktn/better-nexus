@@ -21,7 +21,6 @@ import { statusManager } from './statusManager.js';
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
 
 export const api = express();
-const port = process.env.PORT ? Number(process.env.PORT) : 8081;
 
 api.use(express.json());
 

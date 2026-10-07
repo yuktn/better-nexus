@@ -13,10 +13,11 @@ const agentListSchema = z.object({
 const heartbeatListSchema = z.object({ success: z.literal(true), data: z.array(HeartbeatSchema) });
 
 export function nexusUrl(path: string) {
-  const base = process.env.NEXUS_SERVER_URL;
-  if (!base) throw new Error("NEXUS_SERVER_URL is not configured.");
+  const variable = process.env.NODE_ENV === "development" ? "DEV_NEXUS_SERVER_URL" : "NEXUS_SERVER_URL";
+  const base = process.env[variable];
+  if (!base) throw new Error(`${variable} is not configured.`);
   const url = new URL(`${base.replace(/\/$/, "")}/${path}`);
-  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("NEXUS_SERVER_URL must use HTTP or HTTPS.");
+  if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error(`${variable} must use HTTP or HTTPS.`);
   return url;
 }
 

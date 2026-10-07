@@ -1,6 +1,7 @@
 import { intro, cancel, outro, text, log, spinner, isCancel } from '@clack/prompts';
 import { writeFile, readFile } from "node:fs/promises";
 import { generateSecret, generate, verify, generateURI } from "otplib";
+import { cliPort } from "../config.js";
 
 const s = spinner();
 
@@ -18,7 +19,7 @@ try {
 
     s.start('requesting enrollment to server')
 
-    const response = await fetch(`http://localhost:8082/admin/register`, {
+    const response = await fetch(`http://127.0.0.1:${cliPort}/admin/register`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",

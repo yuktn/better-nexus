@@ -7,7 +7,7 @@
     "nexus-agent": "./dist/cli/index.js"
   },
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
     "start": "node dist/index.js"

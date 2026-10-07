@@ -20,7 +20,6 @@ import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
 
 export const admin = express();
-const port = process.env.PORT ? Number(process.env.PORT) : 8082;
 
 admin.use(express.json());
 

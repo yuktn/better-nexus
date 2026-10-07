@@ -11,12 +11,7 @@ import {
     type Status, type Reason,
     type AgentStatusChange
 } from '@better-nexus/shared';
-import { isIP } from 'node:net';
-import crypto from 'node:crypto';
-import { writeFile, readFile } from "node:fs/promises";
-import { generateSecret, generate, verify, generateURI } from "otplib";
 import { initDb, heartbeats, enrollmentTokens, agents, agentStatusChanges } from "./db.js";
-import { agentAuth } from './middleware/agentAuth.js'
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
 
 async function changeAgentStatus(agentId: string, newStatus: Status, reason?: Reason) {
@@ -43,16 +38,20 @@ export class StatusManager {
 
         let nextStatus: Status = "UP";
         let reason: Reason | undefined;
+        let message: string | undefined;
 
         if (heartbeat.cpu >= 90) {
             nextStatus = "DEGRADED";
             reason = "CPU_HI";
+            message = "CPU usage is too high.";
         } else if (heartbeat.memory >= 90) {
             nextStatus = "DEGRADED";
             reason = "MEM_HI";
+            message = "Memory usage is too high.";
         } else if (heartbeat.temp >= 90) {
             nextStatus = "DEGRADED";
             reason = "TEMP_HI";
+            message = "Temperature is too high."
         }
 
         //genius
@@ -70,7 +69,8 @@ export class StatusManager {
         const agentArray = await agents.find().toArray()
 
         for (const agent of agentArray) {
-            if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")
+            if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") 
+                {changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")}
         }
     }
 }

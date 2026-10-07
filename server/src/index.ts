@@ -2,15 +2,16 @@ import { api } from "./api.js";
 import { admin } from "./admin.js";
 import { initDb } from "./db.js";
 import { statusManager } from "./statusManager.js";
+import { apiPort, cliPort } from "./config.js";
 
 await initDb();
 
-api.listen(8081, "0.0.0.0", () => {
-    console.log("api listening on :8081");
+api.listen(apiPort, "0.0.0.0", () => {
+    console.log(`api listening on :${apiPort}`);
 });
 
-admin.listen(8082, "127.0.0.1", () => {
-    console.log("admin api listnening on :8082");
+admin.listen(cliPort, "127.0.0.1", () => {
+    console.log(`admin api listening on :${cliPort}`);
 });
 
 setInterval(() => {
