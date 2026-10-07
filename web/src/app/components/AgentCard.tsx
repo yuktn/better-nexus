@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { Agent, Heartbeat } from "@better-nexus/shared";
 
 const metrics = ["cpu", "memory", "temp"] as const;
@@ -64,7 +64,7 @@ export type AgentHistoryRequest = {
 
 export type AgentCardProps = {
   /** Omit all data props to display a labeled design preview. */
-  agent?: Pick<Agent, "agentId" | "agentName" | "agentNexusVersion">;
+  agent?: Pick<Agent, "agentId" | "agentName" | "agentNexusVersion"> & Partial<Pick<Agent, "lastSeenOn">>;
   status?: "up" | "degraded" | "down" | "unknown";
   /** Update this prop as new live heartbeats arrive. */
   latestHeartbeat?: Heartbeat | null;
@@ -147,6 +147,8 @@ export default function AgentCard(props: AgentCardProps = {}) {
   // while receiving events, without fetching on every heartbeat.
   const historyRevision = Math.floor((liveHistory[liveHistory.length - 1]?.timestamp ?? 0) / 30_000);
   const [expanded, setExpanded] = useState(false);
+  const [peeking, setPeeking] = useState(false);
+  const showSummary = expanded || peeking;
   const [metric, setMetric] = useState<Metric>("cpu");
   const [range, setRange] = useState<AgentTimeRange>("1M");
   const history = isDemo ? DEMO_HISTORY[range] : props.history ?? EMPTY_HISTORY;
@@ -159,6 +161,35 @@ export default function AgentCard(props: AgentCardProps = {}) {
   } | null>(null);
   const detailsId = useId();
   const titleId = useId();
+  const summaryId = useId();
+  const summaryRef = useRef<HTMLDListElement>(null);
+  const previousSummaryRows = useRef<DOMRect[]>([]);
+
+  const changeExpanded = (next: boolean) => {
+    previousSummaryRows.current = showSummary && summaryRef.current
+      ? Array.from(summaryRef.current.querySelectorAll("[data-summary-motion]"), (row) => row.getBoundingClientRect())
+      : [];
+    setPeeking(false);
+    setExpanded(next);
+  };
+
+  useLayoutEffect(() => {
+    const previous = previousSummaryRows.current;
+    previousSummaryRows.current = [];
+    if (!previous.length || !summaryRef.current || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+
+    // Animate between peek and expanded positions in both directions.
+    const animations = Array.from(summaryRef.current.querySelectorAll("[data-summary-motion]")).flatMap((row, index) => {
+      const before = previous[index];
+      if (!before) return [];
+      const after = row.getBoundingClientRect();
+      return [row.animate([
+        { transform: `translate(${before.left - after.left}px, ${before.top - after.top}px)` },
+        { transform: "translate(0, 0)" },
+      ], { duration: 300, easing: "ease-in-out" })];
+    });
+    return () => animations.forEach((animation) => animation.cancel());
+  }, [expanded]);
 
   useEffect(() => {
     if (!expanded || !loadHistory) return;
@@ -192,12 +223,19 @@ export default function AgentCard(props: AgentCardProps = {}) {
   const statusLabel = status === "unknown" ? "—" : status.toUpperCase();
   const statusColor = status === "up" ? "text-nexus-blue" : status === "degraded" ? "text-nexus-yellow" : status === "down" ? "text-nexus-red" : "text-zinc-500";
   const statusSize = status === "degraded" ? "text-lg sm:text-3xl" : "text-3xl sm:text-5xl";
+  const lastSeenOn = props.agent?.lastSeenOn;
+  const lastSeenDate = lastSeenOn !== undefined && Number.isFinite(lastSeenOn)
+    ? new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "medium" }).format(lastSeenOn)
+    : "Unknown";
+  const lastSeenTime = lastSeenOn !== undefined && Number.isFinite(lastSeenOn)
+    ? new Intl.DateTimeFormat("en-GB", { timeZone, timeStyle: "medium" }).format(lastSeenOn)
+    : "";
   const choiceClass = (selected: boolean) => `border-b-2 px-2 py-2 text-xs font-semibold tracking-wider transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current motion-reduce:transition-none ${selected ? `border-current ${statusColor}` : "border-transparent text-zinc-500 hover:text-zinc-950 dark:hover:text-zinc-100"}`;
 
   return (
     <article aria-labelledby={titleId} aria-label={isDemo ? "Demo agent preview" : undefined} className="w-full overflow-hidden rounded-2xl border border-zinc-200 bg-white text-zinc-950 dark:border-zinc-800 dark:bg-black dark:text-zinc-50">
       <div className={`relative grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 px-6 py-5 transition-[grid-template-rows] duration-300 ease-in-out motion-reduce:transition-none sm:gap-x-8 sm:px-8 sm:py-6 ${expanded ? "grid-rows-[minmax(1.5rem,auto)_minmax(1.5rem,auto)_1.5rem]" : "grid-rows-[minmax(1.5rem,auto)_minmax(1.5rem,auto)_0rem]"}`}>
-        <button type="button" aria-label={`${agent.agentName}: ${expanded ? "collapse" : "expand"} monitoring overview`} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(!expanded)} className="absolute inset-0 cursor-pointer transition-colors hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-nexus-blue motion-reduce:transition-none dark:hover:bg-zinc-950" />
+        <button type="button" aria-label={`${agent.agentName}: ${expanded ? "collapse" : "expand"} monitoring overview`} aria-expanded={expanded} aria-controls={detailsId} onClick={() => changeExpanded(!expanded)} className="absolute inset-0 cursor-pointer transition-colors hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-nexus-blue motion-reduce:transition-none dark:hover:bg-zinc-950" />
         <h2 id={titleId} className="pointer-events-none relative col-start-1 row-start-1 row-span-2 self-center break-words text-left text-3xl font-bold leading-none tracking-tighter sm:text-5xl">
           {agent.agentName}
         </h2>
@@ -205,10 +243,44 @@ export default function AgentCard(props: AgentCardProps = {}) {
           <span title={agent.agentId} className="min-w-0 truncate text-zinc-500"><span className="sr-only">Agent ID: </span>{agent.agentId}</span>
           <span className="shrink-0">v{agent.agentNexusVersion.replace(/^v/, "")}</span>
         </div>
-        <span aria-hidden="true" className={`pointer-events-none invisible col-start-2 row-start-1 row-span-2 font-black leading-none tracking-tighter ${statusSize} ${expanded ? "hidden" : ""}`}>{statusLabel}</span>
-        <span aria-hidden={expanded} className={`pointer-events-none absolute right-6 top-5 font-black leading-none tracking-tighter transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none sm:right-8 sm:top-6 ${statusSize} ${statusColor} ${expanded ? "translate-y-12 opacity-0" : "translate-y-0 opacity-100"}`}>{statusLabel}</span>
-        <dl aria-hidden={!expanded} className={`pointer-events-none relative col-start-2 row-start-1 row-span-3 grid grid-rows-subgrid text-lg leading-none transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none sm:text-xl ${expanded ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"}`}>
-          {metrics.map((item) => <div key={item} className="flex min-h-0 items-center justify-between gap-3 overflow-hidden sm:gap-6"><dt className="text-zinc-500">{labels[item]}</dt><dd className={`text-right font-semibold tabular-nums ${statusColor}`}>{formatValue(live?.[item], item)}</dd></div>)}
+        <div aria-hidden={showSummary} className="pointer-events-none relative col-start-2 row-start-1 row-span-2 min-w-0">
+          <span aria-hidden="true" className={`invisible block whitespace-nowrap font-black leading-none tracking-tighter ${statusSize}`}>{statusLabel}</span>
+          <div className="absolute inset-y-0 right-0 flex items-center">
+            <span className={`block whitespace-nowrap font-black leading-none tracking-tighter transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none ${statusSize} ${statusColor} ${showSummary ? "translate-y-12 opacity-0" : "translate-y-0 opacity-100"}`}>{statusLabel}</span>
+          </div>
+        </div>
+        <button
+          type="button"
+          aria-label={`${statusLabel}: preview ${status === "down" ? "last seen" : "telemetry"}; click to expand ${agent.agentName}`}
+          aria-describedby={showSummary ? summaryId : undefined}
+          aria-controls={detailsId}
+          aria-expanded={expanded}
+          aria-hidden={expanded}
+          inert={expanded}
+          onMouseEnter={() => setPeeking(true)}
+          onMouseLeave={() => setPeeking(false)}
+          onFocus={() => setPeeking(true)}
+          onBlur={() => setPeeking(false)}
+          onKeyDown={(event) => { if (event.key === "Escape") setPeeking(false); }}
+          onClick={() => changeExpanded(true)}
+          className={`relative z-10 col-start-2 row-start-1 row-span-3 cursor-pointer self-stretch focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-current ${statusColor} ${expanded ? "pointer-events-none" : ""}`}
+        />
+        <dl ref={summaryRef} id={summaryId} aria-hidden={!showSummary} className={`pointer-events-none leading-none transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none ${status === "down" ? "text-right text-xs" : "text-lg sm:text-xl"} ${expanded ? "relative col-start-2 row-start-1 row-span-3 grid grid-rows-subgrid translate-y-0 opacity-100" : `absolute right-6 top-1/2 grid -translate-y-1/2 ${status === "down" ? "grid-rows-[repeat(2,1.5rem)]" : "grid-rows-[repeat(3,1.5rem)]"} sm:right-8 ${showSummary ? "translate-y-[-50%] opacity-100" : "-translate-y-[calc(50%+2rem)] opacity-0"}`}`}>
+          {status === "down" ? (
+            <div data-summary-motion className="row-start-1 row-span-2 grid h-12 grid-rows-2 self-start">
+              <dt className="flex min-h-0 items-center justify-end text-zinc-500">Last seen</dt>
+              <dd className="flex min-h-0 tracking-tight items-center justify-end whitespace-nowrap text-lg font-semibold tabular-nums text-nexus-red sm:text-xl">
+                <span className="inline-flex gap-2"><span>{lastSeenDate}</span>{lastSeenTime && <span>{lastSeenTime}</span>}</span>
+              </dd>
+            </div>
+          ) : metrics.map((item) => (
+            <div key={item} className="flex min-h-0 items-center">
+              <div data-summary-motion className="flex h-6 w-full shrink-0 items-center justify-between gap-3 sm:gap-6">
+                <dt className="text-zinc-500">{labels[item]}</dt>
+                <dd className={`text-right font-semibold tabular-nums ${statusColor}`}>{formatValue(live?.[item], item)}</dd>
+              </div>
+            </div>
+          ))}
         </dl>
       </div>
 

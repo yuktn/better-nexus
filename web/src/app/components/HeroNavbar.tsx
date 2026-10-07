@@ -98,7 +98,7 @@ export default function HeroNavbar({ status = "operational" }: { status?: HeroSt
                 aria-hidden={!isCompact}
                 className={`pointer-events-none absolute left-0 top-0 h-8 w-auto origin-left transition-[translate,opacity] duration-300 ease-in-out motion-reduce:transition-none ${
                   isCompact ? "translate-y-0 opacity-100" : "-translate-y-8 opacity-0"
-                }`}
+                }`} 
               />
             </h1>
           </div>
@@ -118,7 +118,7 @@ export default function HeroNavbar({ status = "operational" }: { status?: HeroSt
                 isCompact ? "" : "hidden"
               }`}
             >
-              {health.label}
+              PREVIEW BUILD {health.label}
             </button>
           </nav>
         </div>
