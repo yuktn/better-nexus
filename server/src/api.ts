@@ -468,32 +468,28 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 
 //#region /incidents
 
-//incidents?status=open / resolved
+//incidents?status=open / resolved&countcap=number
 api.get('/incidents', async (_req: Request, res: Response) => {
-	const { status } = _req.query;
+	const { status, countCap } = _req.query;
 
 	if (status === "open" || status === "resolved") {
-		const data = await incidents.find({ status }).toArray();
+		const query = ( countCap ? incidents.find({ status }).limit(Number(countCap)) : incidents.find({ status }))
+		const data = await query.sort({ startedAt: -1, incidentId: -1 }).toArray();
 		return res.status(200).json({ success: true, data });
 	} else {
-		const data = await incidents.find().toArray();
+		const query = ( countCap ? incidents.find().limit(Number(countCap)) : incidents.find())
+		const data = await query.sort({ startedAt: -1, incidentId: -1 }).toArray();
 		return res.status(200).json({ success: true, data });
 	}
 })
 
 
-//incidents/:id?status=open/resolved
+//incidents/:id
 api.get('/incidents/:id', async (_req: Request, res: Response) => {
-	const { status } = _req.query;
-	const { id: agentId } = _req.params;
+	const { id: incidentId } = _req.params;
 
-	if (status === "open" || status === "resolved") {
-		const data = await incidents.find({ status, agentId }).toArray();
-		return res.status(200).json({ success: true, data });
-	} else {
-		const data = await incidents.find({ agentId }).toArray();
-		return res.status(200).json({ success: true, data });
-	}
+	const data = await incidents.find({ incidentId }).toArray();
+	return res.status(200).json({ success: true, data });
 })
 
 //SSE for frontend

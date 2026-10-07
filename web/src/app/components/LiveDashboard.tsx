@@ -6,6 +6,8 @@ import { z } from "zod";
 import type { DashboardSnapshot } from "@/lib/nexus";
 import HeroNavbar, { type HeroStatus } from "./HeroNavbar";
 import ConnectedAgentCard from "./ConnectedAgentCard";
+import IncidentCard from "./IncidentCard";
+import { INCIDENT_PAGE_SIZE, incidentSchema, incidentsSchema, mergeIncidents, type DashboardIncident } from "@/lib/incidents";
 
 const statusChangeSchema = z.object({
   agentId: z.uuidv4(),
@@ -27,6 +29,50 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
   const [connection, setConnection] = useState<"connecting" | "live" | "reconnecting">("connecting");
   const [statuses, setStatuses] = useState<Record<string, z.infer<typeof statusChangeSchema>>>({});
   const [liveHistory, setLiveHistory] = useState<Record<string, Heartbeat[]>>({});
+  const [incidents, setIncidents] = useState<DashboardIncident[]>([]);
+  const [incidentsLoading, setIncidentsLoading] = useState(true);
+  const [incidentsFailed, setIncidentsFailed] = useState(false);
+  const [incidentCountCap, setIncidentCountCap] = useState(INCIDENT_PAGE_SIZE);
+  const [loadedIncidentCountCap, setLoadedIncidentCountCap] = useState(INCIDENT_PAGE_SIZE);
+  const [incidentsHaveMore, setIncidentsHaveMore] = useState(false);
+  const [incidentRevision, setIncidentRevision] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let syncing = false;
+    let retry = false;
+    const syncIncidents = async () => {
+      if (syncing || controller.signal.aborted) return;
+      syncing = true;
+      setIncidentsLoading(true);
+      try {
+        // One extra record tells us whether to offer another batch.
+        const response = await fetch(`/api/incidents?countCap=${incidentCountCap + 1}`, { cache: "no-store", signal: controller.signal });
+        if (!response.ok) throw new Error("Incidents unavailable");
+        const incoming = incidentsSchema.parse(await response.json());
+        if (controller.signal.aborted) return;
+        setIncidents((current) => mergeIncidents(current, incoming.slice(0, incidentCountCap)));
+        setLoadedIncidentCountCap(incidentCountCap);
+        setIncidentsHaveMore(incoming.length > incidentCountCap);
+        setIncidentsFailed(false);
+        retry = false;
+      } catch {
+        if (!controller.signal.aborted) {
+          setIncidentsFailed(true);
+          retry = true;
+        }
+      } finally {
+        syncing = false;
+        if (!controller.signal.aborted) setIncidentsLoading(false);
+      }
+    };
+    void syncIncidents();
+    const timer = setInterval(() => { if (retry) void syncIncidents(); }, 5_000);
+    return () => {
+      controller.abort();
+      clearInterval(timer);
+    };
+  }, [incidentCountCap, incidentRevision]);
 
   useEffect(() => {
     const events = new EventSource("/api/events");
@@ -68,6 +114,7 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
     events.onopen = () => {
       setConnection("live");
       void syncSnapshot();
+      setIncidentRevision((current) => current + 1);
     };
     events.onerror = () => setConnection("reconnecting");
     events.addEventListener("heartbeat", (event) => {
@@ -103,6 +150,13 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       if (!knownAgents.has(change.agentId)) void syncSnapshot();
     });
 
+    events.addEventListener("incidentUpdate", (event) => {
+      let parsed;
+      try { parsed = incidentSchema.safeParse(JSON.parse((event as MessageEvent).data)); } catch { return; }
+      if (!parsed.success) return;
+      setIncidents((current) => mergeIncidents(current, [parsed.data]));
+    });
+
     // Retry failed snapshots only; agent health is owned by the server.
     const retryTimer = setInterval(() => {
       if (retrySnapshot) void syncSnapshot();
@@ -132,6 +186,9 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
           <p role="status">{connection === "live" ? (failed ? "Connected · snapshot unavailable" : "Live") : connection === "connecting" ? "Connecting to live updates…" : "Reconnecting · showing last received data"}</p>
           <a href="/" className="text-nexus-blue underline underline-offset-4">Refresh data</a>
         </div>
+        <IncidentCard incidents={incidents} agents={cards.map((card) => card.agent)} loading={incidentsLoading} failed={incidentsFailed}
+          countCap={loadedIncidentCountCap} hasMore={incidentsHaveMore || incidents.length > loadedIncidentCountCap}
+          onShowMore={() => setIncidentCountCap((current) => current + INCIDENT_PAGE_SIZE)} />
         {cards.length === 0 ? (
           <p role="status" className="w-full rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500 dark:border-zinc-800">{failed ? "Unable to load agents. Retrying the connection." : "No agents registered yet."}</p>
         ) : cards.map(({ agent, latestHeartbeat }) => (

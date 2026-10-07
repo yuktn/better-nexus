@@ -47,6 +47,10 @@ export class IncidentManager {
         await incidents.insertOne(incident)
     }
 
+    async addMessage(incidentId: string, message: string, date: Date) {
+        //TODO: implement add message
+    }
+
     async resolveIncident(incidentId: string, agentId: string) {
         const incident = await incidents.findOneAndUpdate(
             {

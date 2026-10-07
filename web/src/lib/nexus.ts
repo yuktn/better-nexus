@@ -1,6 +1,7 @@
 import "server-only";
 import { AgentSchema, HeartbeatSchema } from "@better-nexus/shared";
 import { z } from "zod";
+import { incidentsSchema } from "./incidents";
 
 // /agents omits the private sourceIP and ipType fields.
 const agentListSchema = z.object({
@@ -29,6 +30,10 @@ async function request(path: string) {
 
 export async function getAgents() {
   return agentListSchema.parse(await request("agents")).data;
+}
+
+export async function getIncidents(countCap: number) {
+  return z.object({ success: z.literal(true), data: incidentsSchema }).parse(await request(`incidents?countCap=${countCap}`)).data;
 }
 
 export async function getLatestHeartbeat(agentId: string) {
