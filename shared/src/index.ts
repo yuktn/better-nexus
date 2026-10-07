@@ -1,7 +1,7 @@
-import { z } from "zod";
+import { unknown, z } from "zod";
 
 export const StatusSchema = z.enum({ UP: "UP", DEGRADED: "DEGRADED", DOWN: "DOWN" } as const);
-export const ReasonSchema = z.enum({ TEMP_HI: "TEMP_HI", CPU_HI: "CPU_HI", MEM_HI: "MEM_HI", TIMEOUT: "TIMEOUT" } as const);
+export const ReasonSchema = z.enum({ TEMP_HI: "TEMP_HI", CPU_HI: "CPU_HI", MEM_HI: "MEM_HI", TIMEOUT: "TIMEOUT", UNKNOWN: "UNKNOWN" } as const);
 export const PlatformSchema = z.enum({ windows: "windows", mac: "mac", linux: "linux" } as const);
 
 export type Status = z.infer<typeof StatusSchema>;
@@ -147,7 +147,10 @@ export const IncidentSchema = z.object({
   startedAt: z.date(),
   resolvedAt: z.date().nullable(),
 
-  message: z.string(),
+  messages: z.object({
+    message: z.string(),
+    timestamp: z.date()
+  }).array(),
 
   createdAt: z.date(),
   updatedAt: z.date(),

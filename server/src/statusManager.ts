@@ -11,8 +11,9 @@ import {
     type Status, type Reason,
     type AgentStatusChange
 } from '@better-nexus/shared';
-import { initDb, heartbeats, enrollmentTokens, agents, agentStatusChanges } from "./db.js";
+import { initDb, heartbeats, enrollmentTokens, agents, agentStatusChanges, incidents } from "./db.js";
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
+import { incidentManager } from './incidentManager.js';
 
 async function changeAgentStatus(agentId: string, newStatus: Status, reason?: Reason) {
     const statusChange: AgentStatusChange = {
@@ -34,33 +35,83 @@ async function changeAgentStatus(agentId: string, newStatus: Status, reason?: Re
 export class StatusManager {
     async onHeartbeat(agentId: string, heartbeat: Heartbeat) {
         const agent = await agents.findOne({ agentId });
+
         if (!agent) return;
 
-        let nextStatus: Status = "UP";
-        let reason: Reason | undefined;
-        let message: string | undefined;
+        const conditions = [
+            {
+                active: heartbeat.cpu >= 90,
+                reason: "CPU_HI" as const,
+                severity: "DEGRADED" as const,
+                message: "The system automatically detected an incident, caused by high CPU usage."
+            },
+            {
+                active: heartbeat.memory >= 90,
+                reason: "MEM_HI" as const,
+                severity: "DEGRADED" as const,
+                message: "The system automatically detected an incident, caused by high memory usage."
+            },
+            {
+                active: heartbeat.temp >= 90,
+                reason: "TEMP_HI" as const,
+                severity: "DEGRADED" as const,
+                message: "The system automatically detected an incident, caused by high temperature."
+            }
+        ];
 
-        if (heartbeat.cpu >= 90) {
-            nextStatus = "DEGRADED";
-            reason = "CPU_HI";
-            message = "CPU usage is too high.";
-        } else if (heartbeat.memory >= 90) {
-            nextStatus = "DEGRADED";
-            reason = "MEM_HI";
-            message = "Memory usage is too high.";
-        } else if (heartbeat.temp >= 90) {
-            nextStatus = "DEGRADED";
-            reason = "TEMP_HI";
-            message = "Temperature is too high."
+        for (const condition of conditions) {
+            const existing = await incidents.findOne({
+                agentId,
+                reason: condition.reason,
+                status: "open"
+            });
+
+            if (condition.active && !existing) {
+                await incidentManager.addIncident(
+                    agentId,
+                    condition.message,
+                    condition.reason,
+                    new Date(),
+                    condition.severity
+                );
+            }
+
+            if (!condition.active && existing) {
+                await incidentManager.resolveIncident(
+                    existing.incidentId,
+                    agentId
+                );
+            }
         }
 
-        //genius
-        if (agent.status !== nextStatus) {
-            await changeAgentStatus(
-                agentId,
-                nextStatus,
-                reason
+        const timeoutIncident = await incidents.findOne({
+            agentId,
+            reason: "TIMEOUT",
+            status: "open"
+        });
+
+        if (timeoutIncident) {
+            await incidentManager.resolveIncident(
+                timeoutIncident.incidentId,
+                agentId
             );
+        }
+
+        const activeIncidents = await incidents.find({
+            agentId,
+            status: "open"
+        }).toArray();
+
+        let nextStatus: Status = "UP";
+
+        if (activeIncidents.some(i => i.severity === "DOWN")) {
+            nextStatus = "DOWN";
+        } else if (activeIncidents.some(i => i.severity === "DEGRADED")) {
+            nextStatus = "DEGRADED";
+        }
+
+        if (agent.status !== nextStatus) {
+            await changeAgentStatus(agentId, nextStatus);
         }
     }
 
@@ -69,8 +120,10 @@ export class StatusManager {
         const agentArray = await agents.find().toArray()
 
         for (const agent of agentArray) {
-            if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") 
-                {changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")}
+            if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") {
+                changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")
+                await incidentManager.addIncident(agent.agentId, "The server isn't getting responses from this agent.", "TIMEOUT", new Date(), "DOWN")
+            }
         }
     }
 }

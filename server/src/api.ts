@@ -15,7 +15,7 @@ import crypto from 'node:crypto';
 import { writeFile, readFile } from "node:fs/promises";
 import { generateSecret, generate, verify, generateURI } from "otplib";
 
-import { initDb, heartbeats, enrollmentTokens, agents } from "./db.js";
+import { initDb, heartbeats, enrollmentTokens, agents, incidents } from "./db.js";
 import { agentAuth } from './middleware/agentAuth.js';
 import { statusManager } from './statusManager.js';
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
@@ -150,7 +150,7 @@ api.post('/agents', async (_req: Request, res: Response) => {
 		sourceIP: agentIP,
 		ipType,
 		hashedAgentSecret,
-		status: "UP" // TODO: add status manager + watchdog
+		status: "UP"
 	}
 
 	try {
@@ -303,9 +303,9 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 	try {
 		const lastSeenOnUpdate = await agents.updateOne({ agentId }, { $set: { lastSeenOn: Date.now() } })
 		const result = await heartbeats.insertOne(hb)
-		
+
 		sendSseEvent('heartbeat', hb)
-		statusManager.onHeartbeat(agentId, {temp, cpu, memory, timestamp} )
+		statusManager.onHeartbeat(agentId, { temp, cpu, memory, timestamp })
 
 		if (result.insertedId && lastSeenOnUpdate.matchedCount === 1) {
 			const id = result.insertedId
@@ -465,6 +465,36 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 		});
 	}
 });
+
+//#region /incidents
+
+//incidents?status=open / resolved
+api.get('/incidents', async (_req: Request, res: Response) => {
+	const { status } = _req.query;
+
+	if (status === "open" || status === "resolved") {
+		const data = await incidents.find({ status }).toArray();
+		return res.status(200).json({ success: true, data });
+	} else {
+		const data = await incidents.find().toArray();
+		return res.status(200).json({ success: true, data });
+	}
+})
+
+
+//incidents/:id?status=open/resolved
+api.get('/incidents/:id', async (_req: Request, res: Response) => {
+	const { status } = _req.query;
+	const { id: agentId } = _req.params;
+
+	if (status === "open" || status === "resolved") {
+		const data = await incidents.find({ status, agentId }).toArray();
+		return res.status(200).json({ success: true, data });
+	} else {
+		const data = await incidents.find({ agentId }).toArray();
+		return res.status(200).json({ success: true, data });
+	}
+})
 
 //SSE for frontend
 api.get('/events', (_req, res) => {
