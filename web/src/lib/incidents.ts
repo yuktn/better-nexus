@@ -3,6 +3,7 @@ import { z } from "zod";
 
 // Dates are serialized as ISO strings by both the API and SSE.
 export const incidentSchema = IncidentSchema.extend({
+  title: z.string().optional(),
   startedAt: z.iso.datetime(),
   resolvedAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),

@@ -18,7 +18,7 @@ import { initDb, heartbeats, enrollmentTokens, incidents, agents, agentStatusCha
 import { addSseClient, removeSseClient, sendSseEvent } from './sse.js';
 
 export class IncidentManager {
-    async addIncident(agentId: string, message: string, reason: IncidentReason, startedAt: Date, nextStatus: Status) {
+    async addIncident(agentId: string, message: string, reason: IncidentReason, startedAt: Date, nextStatus: Status, title: string) {
         if (nextStatus == "UP") return;
 
         const incidentId = crypto.randomUUID();
@@ -30,6 +30,7 @@ export class IncidentManager {
         })) return;
 
         const incident: Incident = {
+            title,
             incidentId,
             agentId,
             status: "open",
@@ -47,8 +48,20 @@ export class IncidentManager {
         await incidents.insertOne(incident)
     }
 
-    async addMessage(incidentId: string, message: string, date: Date) {
-        //TODO: implement add message
+    async addMessage(incidentId: string, message: string, timestamp: Date) {
+        const incident = await incidents.findOneAndUpdate({incidentId}, {$push: {messages: { timestamp, message }}, $set: { updatedAt: new Date()}})
+        
+        sendSseEvent("incidentUpdate", incident)
+
+        if (!incident) return
+    }
+
+    async editTitle(incidentId: string, title: string) {
+        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title }})
+
+        sendSseEvent("incidentUpdate", incident)
+
+        if (!incident) return
     }
 
     async resolveIncident(incidentId: string, agentId: string) {

@@ -138,6 +138,7 @@ export type IncidentReason = z.infer<typeof IncidentReasonSchema>;
 
 export const IncidentSchema = z.object({
   incidentId: z.uuid(),
+  title: z.string(),
   agentId: z.uuid(),
 
   status: IncidentStatusSchema,

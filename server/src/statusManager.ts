@@ -43,19 +43,22 @@ export class StatusManager {
                 active: heartbeat.cpu >= 90,
                 reason: "CPU_HI" as const,
                 severity: "DEGRADED" as const,
-                message: "The system automatically detected an incident, caused by high CPU usage."
+                message: "The system automatically detected an incident, caused by high CPU usage.",
+                title: "High CPU Usage"
             },
             {
                 active: heartbeat.memory >= 90,
                 reason: "MEM_HI" as const,
                 severity: "DEGRADED" as const,
-                message: "The system automatically detected an incident, caused by high memory usage."
+                message: "The system automatically detected an incident, caused by high memory usage.",
+                title: "High Memory Usage"
             },
             {
                 active: heartbeat.temp >= 90,
                 reason: "TEMP_HI" as const,
                 severity: "DEGRADED" as const,
-                message: "The system automatically detected an incident, caused by high temperature."
+                message: "The system automatically detected an incident, caused by high temperature.",
+                title: "High Temperature"
             }
         ];
 
@@ -72,7 +75,8 @@ export class StatusManager {
                     condition.message,
                     condition.reason,
                     new Date(),
-                    condition.severity
+                    condition.severity,
+                    condition.title,
                 );
             }
 
@@ -122,7 +126,7 @@ export class StatusManager {
         for (const agent of agentArray) {
             if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") {
                 changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")
-                await incidentManager.addIncident(agent.agentId, "The server isn't getting responses from this agent.", "TIMEOUT", new Date(), "DOWN")
+                await incidentManager.addIncident(agent.agentId, "The server isn't getting responses from this agent.", "TIMEOUT", new Date(), "DOWN", "Agent Unreachable")
             }
         }
     }

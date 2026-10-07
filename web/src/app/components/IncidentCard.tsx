@@ -3,14 +3,6 @@
 import { useId, useState, useSyncExternalStore } from "react";
 import type { DashboardIncident } from "@/lib/incidents";
 
-const reasonLabels: Record<DashboardIncident["reason"], string> = {
-  CPU_HI: "High CPU usage",
-  MEM_HI: "High memory usage",
-  TEMP_HI: "High temperature",
-  TIMEOUT: "Agent stopped responding",
-  UNKNOWN: "Unknown cause",
-};
-
 const subscribeToTimezone = () => () => {};
 const serverTimezone = () => "UTC";
 function clientTimezone() {
@@ -36,8 +28,8 @@ function IncidentEntry({ incident, name, formatTime }: {
       <button type="button" aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(!expanded)}
         className="flex w-full items-center justify-between gap-4 px-6 py-4 text-left transition-colors hover:bg-zinc-50 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-nexus-blue motion-reduce:transition-none dark:hover:bg-zinc-950 sm:px-8">
         <div className="min-w-0">
-          <h3 className="break-words text-lg font-bold leading-tight tracking-tight sm:text-xl">{name} <span className={color}>{incident.status === "resolved" ? "resolved" : "ongoing"}</span></h3>
-          <p className="mt-1 text-xs text-zinc-500">{reasonLabels[incident.reason]} <span aria-hidden="true">·</span> <time dateTime={incident.startedAt}>{formatTime(incident.startedAt)}</time></p>
+          <h3 className="break-words text-lg font-bold leading-tight tracking-tight sm:text-xl">{incident.title || "Incident"} <span className={color}>{incident.status === "resolved" ? "resolved" : "ongoing"}</span></h3>
+          <p className="mt-1 text-xs text-zinc-500">{name} <span aria-hidden="true">·</span> <time dateTime={incident.startedAt}>{formatTime(incident.startedAt)}</time></p>
         </div>
       </button>
       <div id={detailsId} aria-hidden={!expanded} inert={!expanded}

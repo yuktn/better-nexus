@@ -222,7 +222,7 @@ export default function AgentCard(props: AgentCardProps = {}) {
   const error = Boolean(loadHistory && result?.error);
   const statusLabel = status === "unknown" ? "—" : status.toUpperCase();
   const statusColor = status === "up" ? "text-nexus-blue" : status === "degraded" ? "text-nexus-yellow" : status === "down" ? "text-nexus-red" : "text-zinc-500";
-  const statusSize = status === "degraded" ? "text-lg sm:text-3xl" : "text-3xl sm:text-5xl";
+  const statusSize = "text-3xl sm:text-5xl";
   const lastSeenOn = props.agent?.lastSeenOn;
   const lastSeenDate = lastSeenOn !== undefined && Number.isFinite(lastSeenOn)
     ? new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "medium" }).format(lastSeenOn)
