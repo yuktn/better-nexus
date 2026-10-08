@@ -11,7 +11,7 @@ function mockAgent() {
   const agent: AgentDocument = {
     agentId,
     agentName: "test-agent",
-    agentNexusVersion: "0.1.0",
+    agentNexusVersion: "0.1.2",
     platform: "linux",
     sourceIP: "127.0.0.1",
     ipType: "ipv4",

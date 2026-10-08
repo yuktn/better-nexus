@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-VERSION="${NEXUS_VERSION:-v0.1.0}"
+VERSION="${NEXUS_VERSION:-v0.1.2}"
 REPO="https://github.com/yuktn/better-nexus.git"
 
 INSTALL_DIR="/opt/better-nexus-server"

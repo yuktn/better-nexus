@@ -17,7 +17,7 @@ switch (command) {
 
     default:
         console.log(`
-nexus-server v0.1.0
+nexus-server v0.1.2
 
 Usage:
   nexus-server setup

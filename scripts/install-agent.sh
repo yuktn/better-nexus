@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-VERSION="${NEXUS_VERSION:-v0.1.1}"
+VERSION="${NEXUS_VERSION:-v0.1.2}"
 REPO="https://github.com/yuktn/better-nexus.git"
 
 INSTALL_DIR="/opt/better-nexus-agent"
@@ -206,10 +206,10 @@ else
 
   runuser -u "$NEXUS_USER" -- \
     "$NODE_BIN" --input-type=module - \
-    "$INSTALL_DIR/agent/package.json" "$CONFIG_DIR/config.json" <<'NODE'
+    "$INSTALL_DIR/agent/package.json" "$CONFIG_DIR/config.json" "$CONFIG_DIR/agent.token" <<'NODE'
 import { readFile, writeFile, rename, rm } from "node:fs/promises";
 
-const [packagePath, configPath] = process.argv.slice(2);
+const [packagePath, configPath, tokenPath] = process.argv.slice(2);
 const metadata = JSON.parse(await readFile(packagePath, "utf8"));
 const config = JSON.parse(await readFile(configPath, "utf8"));
 
@@ -218,6 +218,24 @@ if (typeof metadata.version !== "string" || !metadata.version) {
 }
 
 const version = `v${metadata.version}`;
+const agentSecret = (await readFile(tokenPath, "utf8")).trim();
+const response = await fetch(`${config.serverUrl.replace(/\/+$/, "")}/agents`, {
+  method: "PATCH",
+  headers: {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${agentSecret}`,
+    "X-Nexus-Agent-ID": config.agentId,
+  },
+  body: JSON.stringify({ field: "agentNexusVersion", newValue: version }),
+  signal: AbortSignal.timeout(10_000),
+});
+const result = await response.json();
+const alreadyCurrent = response.status === 409 && result.error === "New value is same as old value.";
+if (!(response.ok && result.success === true) && !alreadyCurrent) {
+  throw new Error(`Server agent version update failed (HTTP ${response.status}).`);
+}
+
+// Update MongoDB first, then persist the matching local version.
 if (config.agentNexusVersion !== version) {
   config.agentNexusVersion = version;
   const temporaryPath = `${configPath}.${process.pid}.tmp`;
@@ -229,7 +247,7 @@ if (config.agentNexusVersion !== version) {
   }
 }
 
-console.log(`Agent configuration version: ${version}`);
+console.log(`Agent version synchronized with server: ${version}`);
 NODE
 fi
 

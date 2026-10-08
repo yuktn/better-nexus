@@ -30,7 +30,7 @@ function clientTimezone() {
 const DEMO_AGENT = {
   agentId: "00000000-0000-4000-8000-000000000001",
   agentName: "nexus-node-01",
-  agentNexusVersion: "0.1.0",
+  agentNexusVersion: "0.1.2",
 };
 const DEMO_LATEST: Heartbeat = {
   cpu: 14,
