@@ -49,5 +49,9 @@ export async function initDb() {
     { expireAfterSeconds: 0 }
   );
 
+  await incidents.createIndex(
+    { startedAt: -1, incidentId: -1 }
+  );
+
   console.log("Connected to MongoDB");
 }

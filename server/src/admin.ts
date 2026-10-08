@@ -9,15 +9,18 @@ import {
     type AgentInfo, AgentInfoSchema,
     type AgentDocument,
     type HeartbeatDocument,
-    type EnrollmentToken
+    type EnrollmentToken,
+    IncidentEditRequestSchema
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
 import { writeFile, readFile } from "node:fs/promises";
 import { generateSecret, generate, verify, generateURI } from "otplib";
+import { initDb, agents, heartbeats, enrollmentTokens, incidents } from "./db.js";
+import { adminAuth } from "./middleware/adminAuth.js";
+import { incidentManager } from "./incidentManager.js";
+import { success } from "zod";
 
-import { initDb, agents, heartbeats, enrollmentTokens } from "./db.js";
-import { agentAuth } from './middleware/agentAuth.js';
 
 export const admin = express();
 
@@ -35,23 +38,7 @@ admin.get('/health', (_req: Request, res: Response) => {
 //#region /server
 
 //issue temporary enrollment token. SHOULD ONLY BE DONE BY THE CLI
-admin.post('/admin/register', async (_req: Request, res: Response) => {
-
-    const secretContent = await readFile(tokenPath, "utf8");
-
-    const secret = secretContent.trim()
-
-    const authHeader = _req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ success: false, error: 'Unauthorized.' });
-    }
-
-    const TOTPToken: string = authHeader.slice(7)
-
-    if (!(await verify({ secret, token: TOTPToken })).valid) {
-        return res.status(401).json({ success: false, error: "Unauthorized." })
-    }
+admin.post('/admin/register', adminAuth, async (_req: Request, res: Response) => {
 
     const enrollmentToken = crypto.randomBytes(32).toString('hex');
     const hashedEnrollmentToken = crypto.createHash('sha256').update(enrollmentToken).digest('hex');
@@ -77,3 +64,32 @@ admin.post('/admin/register', async (_req: Request, res: Response) => {
 })
 
 //#endregion
+
+//#region /admin/incidents
+
+// /admin/incidents/:id
+
+admin.post('/admin/incidents', adminAuth, async (_req: Request, res: Response) => {
+    const result = IncidentEditRequestSchema.safeParse(_req.body)
+
+    if (!result.success) { return res.status(400).json({ success: false, error: "necessary input not provided" }) }
+
+    const { field, value, incidentId } = result.data
+
+    if (!field || !incidentId || !value) { return res.status(400).json({ success: false, error: "necessary input not provided" }) }
+
+    switch (field) {
+        case "message":
+            await incidentManager.addMessage(incidentId, value, new Date())
+            break;
+        case "title":
+            await incidentManager.editTitle(incidentId, value)
+            break;
+    }
+
+    const data = await incidents.find({incidentId})
+
+    return res.status(200).json({
+        success: true, data
+    })
+})

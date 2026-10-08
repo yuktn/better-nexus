@@ -54,12 +54,12 @@ function IncidentEntry({ incident, name, formatTime }: {
   );
 }
 
-export default function IncidentCard({ incidents, agents, loading, failed, countCap, hasMore, onShowMore }: {
+export default function IncidentCard({ incidents, agents, loading, failed, visibleCount, hasMore, onShowMore }: {
   incidents: DashboardIncident[];
   agents: { agentId: string; agentName: string }[];
   loading: boolean;
   failed: boolean;
-  countCap: number;
+  visibleCount: number;
   hasMore: boolean;
   onShowMore: () => void;
 }) {
@@ -71,7 +71,7 @@ export default function IncidentCard({ incidents, agents, loading, failed, count
   const expanded = showHistory;
   const color = open.length === 0 ? "text-nexus-blue" : open.some((incident) => incident.severity === "DOWN") ? "text-nexus-red" : "text-nexus-yellow";
   // Keep the entire list mounted so closing can animate without replacing it.
-  const visible = incidents.slice().sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.incidentId.localeCompare(a.incidentId)).slice(0, countCap);
+  const visible = incidents.slice().sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.incidentId.localeCompare(a.incidentId)).slice(0, visibleCount);
   const names = new Map(agents.map((agent) => [agent.agentId, agent.agentName]));
   const formatter = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "medium", timeStyle: "short" });
   const formatTime = (value: string) => formatter.format(new Date(value));

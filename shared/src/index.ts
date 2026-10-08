@@ -158,3 +158,35 @@ export const IncidentSchema = z.object({
 });
 
 export type Incident = z.infer<typeof IncidentSchema>;
+
+export const IncidentRequestSchema = z.object({
+  status: z.enum(["open", "resolved"]).optional(),
+  pagination: z.union([
+    z.object({
+      countCap: z.number().int().positive(),
+      batch: z.undefined(),
+      page: z.undefined(),
+    }),
+
+    z.object({
+      countCap: z.undefined(),
+      batch: z.number().int().positive(),
+      page: z.number().int().positive(),
+    }),
+
+    z.object({
+      countCap: z.undefined(),
+      batch: z.undefined(),
+      page: z.undefined(),
+    })])
+})
+
+export type IncidentRequest = z.infer<typeof IncidentRequestSchema>
+
+export const IncidentEditRequestSchema = z.object({
+  field: z.string(),
+  value: z.string(),
+  incidentId: z.uuidv4()
+})
+
+export type IncidentEditRequest = z.infer<typeof IncidentEditRequestSchema>

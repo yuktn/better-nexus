@@ -8,7 +8,8 @@ import {
 	type AgentInfo, AgentInfoSchema,
 	type AgentDocument,
 	type HeartbeatDocument,
-	type EnrollmentToken
+	type EnrollmentToken,
+	IncidentRequestSchema
 } from '@better-nexus/shared';
 import { isIP } from 'node:net';
 import crypto from 'node:crypto';
@@ -467,21 +468,35 @@ api.get('/hb/:id', async (_req: Request, res: Response) => {
 });
 
 //#region /incidents
-
-//incidents?status=open / resolved&countcap=number
 api.get('/incidents', async (_req: Request, res: Response) => {
-	const { status, countCap } = _req.query;
+	const hasQuery = Object.keys(_req.query).length > 0;
+	const numberParam = (value: unknown) => typeof value === "string" ? Number(value) : value;
+	const input = hasQuery ? {
+		status: _req.query.status,
+		pagination: {
+			countCap: numberParam(_req.query.countCap),
+			batch: numberParam(_req.query.batch),
+			page: numberParam(_req.query.page),
+		},
+	} : (_req.body ?? { pagination: {} });
+	const result = IncidentRequestSchema.safeParse(input);
 
-	if (status === "open" || status === "resolved") {
-		const query = ( countCap ? incidents.find({ status }).limit(Number(countCap)) : incidents.find({ status }))
-		const data = await query.sort({ startedAt: -1, incidentId: -1 }).toArray();
-		return res.status(200).json({ success: true, data });
-	} else {
-		const query = ( countCap ? incidents.find().limit(Number(countCap)) : incidents.find())
-		const data = await query.sort({ startedAt: -1, incidentId: -1 }).toArray();
-		return res.status(200).json({ success: true, data });
+	if (!result.success) {
+		return res.status(400).json({ success: false, error: "Bad Request." });
 	}
-})
+
+	const { status, pagination } = result.data;
+	const { countCap, page, batch } = pagination;
+	const query = incidents.find(status ? { status } : {}).sort({ startedAt: -1, incidentId: -1 });
+	if (batch !== undefined && page !== undefined) {
+		query.skip((page - 1) * batch).limit(batch);
+	} else if (countCap !== undefined) {
+		query.limit(countCap);
+	}
+
+	const data = await query.toArray();
+	return res.status(200).json({ success: true, data });
+});
 
 
 //incidents/:id

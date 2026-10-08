@@ -57,7 +57,7 @@ export class IncidentManager {
     }
 
     async editTitle(incidentId: string, title: string) {
-        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title }})
+        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title, updatedAt: new Date()}})
 
         sendSseEvent("incidentUpdate", incident)
 

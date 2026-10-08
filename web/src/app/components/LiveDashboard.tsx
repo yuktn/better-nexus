@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { HeartbeatSchema, type Heartbeat } from "@better-nexus/shared";
 import { z } from "zod";
 import type { DashboardSnapshot } from "@/lib/nexus";
@@ -32,10 +32,11 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
   const [incidents, setIncidents] = useState<DashboardIncident[]>([]);
   const [incidentsLoading, setIncidentsLoading] = useState(true);
   const [incidentsFailed, setIncidentsFailed] = useState(false);
-  const [incidentCountCap, setIncidentCountCap] = useState(INCIDENT_PAGE_SIZE);
-  const [loadedIncidentCountCap, setLoadedIncidentCountCap] = useState(INCIDENT_PAGE_SIZE);
+  const [incidentPage, setIncidentPage] = useState(1);
+  const [loadedIncidentPage, setLoadedIncidentPage] = useState(1);
   const [incidentsHaveMore, setIncidentsHaveMore] = useState(false);
   const [incidentRevision, setIncidentRevision] = useState(0);
+  const loadedIncidentRevision = useRef(-1);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,14 +47,21 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       syncing = true;
       setIncidentsLoading(true);
       try {
-        // One extra record tells us whether to offer another batch.
-        const response = await fetch(`/api/incidents?countCap=${incidentCountCap + 1}`, { cache: "no-store", signal: controller.signal });
-        if (!response.ok) throw new Error("Incidents unavailable");
-        const incoming = incidentsSchema.parse(await response.json());
+        // Append only the next page. After reconnecting, refresh loaded pages
+        // to recover incident updates missed while the stream was offline.
+        const pages = loadedIncidentRevision.current === incidentRevision
+          ? [incidentPage]
+          : Array.from({ length: incidentPage }, (_, index) => index + 1);
+        const batches = await Promise.all(pages.map(async (page) => {
+          const response = await fetch(`/api/incidents?batch=${INCIDENT_PAGE_SIZE}&page=${page}`, { cache: "no-store", signal: controller.signal });
+          if (!response.ok) throw new Error("Incidents unavailable");
+          return incidentsSchema.parse(await response.json());
+        }));
         if (controller.signal.aborted) return;
-        setIncidents((current) => mergeIncidents(current, incoming.slice(0, incidentCountCap)));
-        setLoadedIncidentCountCap(incidentCountCap);
-        setIncidentsHaveMore(incoming.length > incidentCountCap);
+        setIncidents((current) => mergeIncidents(current, batches.flat()));
+        setLoadedIncidentPage(incidentPage);
+        setIncidentsHaveMore(batches[batches.length - 1].length === INCIDENT_PAGE_SIZE);
+        loadedIncidentRevision.current = incidentRevision;
         setIncidentsFailed(false);
         retry = false;
       } catch {
@@ -72,7 +80,7 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       controller.abort();
       clearInterval(timer);
     };
-  }, [incidentCountCap, incidentRevision]);
+  }, [incidentPage, incidentRevision]);
 
   useEffect(() => {
     const events = new EventSource("/api/events");
@@ -187,8 +195,13 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
           <a href="/" className="text-nexus-blue underline underline-offset-4">Refresh data</a>
         </div>
         <IncidentCard incidents={incidents} agents={cards.map((card) => card.agent)} loading={incidentsLoading} failed={incidentsFailed}
-          countCap={loadedIncidentCountCap} hasMore={incidentsHaveMore || incidents.length > loadedIncidentCountCap}
-          onShowMore={() => setIncidentCountCap((current) => current + INCIDENT_PAGE_SIZE)} />
+          visibleCount={loadedIncidentPage * INCIDENT_PAGE_SIZE} hasMore={incidentsHaveMore || incidents.length > loadedIncidentPage * INCIDENT_PAGE_SIZE}
+          onShowMore={() => {
+            if (incidentsLoading) return;
+            setIncidentsLoading(true);
+            if (incidentPage === loadedIncidentPage + 1) setIncidentRevision((current) => current + 1);
+            else setIncidentPage(loadedIncidentPage + 1);
+          }} />
         {cards.length === 0 ? (
           <p role="status" className="w-full rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500 dark:border-zinc-800">{failed ? "Unable to load agents. Retrying the connection." : "No agents registered yet."}</p>
         ) : cards.map(({ agent, latestHeartbeat }) => (
