@@ -7,6 +7,7 @@
     "nexus-server": "./dist/cli/index.js"
   },
   "scripts": {
+    "test": "tsx --test test/*.test.ts",
     "dev": "NODE_ENV=development tsx watch --env-file-if-exists=.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",

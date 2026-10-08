@@ -9,6 +9,7 @@
     "shared"
   ],
   "scripts": {
+    "test": "npm run build -w shared && npm run test -w shared && npm run test -w server",
     "dev:server": "npm run dev -w server",
     "dev:web": "npm run dev -w web",
     "dev:agent": "npm run dev -w agent",
