@@ -32,8 +32,12 @@ export async function getAgents() {
   return agentListSchema.parse(await request("agents")).data;
 }
 
-export async function getIncidents(batch: number, page: number) {
-  return z.object({ success: z.literal(true), data: incidentsSchema }).parse(await request(`incidents?batch=${batch}&page=${page}`)).data;
+export async function getIncidents(batch?: number, page?: number, status?: "open" | "resolved") {
+  const params = new URLSearchParams();
+  if (status) params.set("status", status);
+  if (batch !== undefined) params.set("batch", String(batch));
+  if (page !== undefined) params.set("page", String(page));
+  return z.object({ success: z.literal(true), data: incidentsSchema }).parse(await request(`incidents?${params}`)).data;
 }
 
 export async function getLatestHeartbeat(agentId: string) {

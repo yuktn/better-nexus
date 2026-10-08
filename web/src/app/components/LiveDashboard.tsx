@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { HeartbeatSchema, type Heartbeat } from "@better-nexus/shared";
 import { z } from "zod";
 import type { DashboardSnapshot } from "@/lib/nexus";
@@ -36,7 +36,8 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
   const [loadedIncidentPage, setLoadedIncidentPage] = useState(1);
   const [incidentsHaveMore, setIncidentsHaveMore] = useState(false);
   const [incidentRevision, setIncidentRevision] = useState(0);
-  const loadedIncidentRevision = useRef(-1);
+  const [pageIncidentIds, setPageIncidentIds] = useState<string[]>([]);
+  const [openIncidentIds, setOpenIncidentIds] = useState<string[]>([]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -47,21 +48,35 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       syncing = true;
       setIncidentsLoading(true);
       try {
-        // Append only the next page. After reconnecting, refresh loaded pages
-        // to recover incident updates missed while the stream was offline.
-        const pages = loadedIncidentRevision.current === incidentRevision
-          ? [incidentPage]
-          : Array.from({ length: incidentPage }, (_, index) => index + 1);
-        const batches = await Promise.all(pages.map(async (page) => {
-          const response = await fetch(`/api/incidents?batch=${INCIDENT_PAGE_SIZE}&page=${page}`, { cache: "no-store", signal: controller.signal });
+        const fetchIncidents = async (url: string) => {
+          const response = await fetch(url, { cache: "no-store", signal: controller.signal });
           if (!response.ok) throw new Error("Incidents unavailable");
           return incidentsSchema.parse(await response.json());
-        }));
+        };
+        const ongoing = await fetchIncidents("/api/incidents?status=open");
+        ongoing.sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.incidentId.localeCompare(a.incidentId));
+
+        // Paginate one ordered list: all open incidents, then resolved history.
+        // Include one lookahead record to determine whether Next is available.
+        const offset = (incidentPage - 1) * INCIDENT_PAGE_SIZE;
+        const openWindow = ongoing.slice(offset, offset + INCIDENT_PAGE_SIZE + 1);
+        const resolvedNeeded = INCIDENT_PAGE_SIZE + 1 - openWindow.length;
+        const resolvedOffset = Math.max(0, offset - ongoing.length);
+        let resolved: DashboardIncident[] = [];
+        if (resolvedNeeded > 0) {
+          const firstPage = Math.floor(resolvedOffset / INCIDENT_PAGE_SIZE) + 1;
+          const lastPage = Math.floor((resolvedOffset + resolvedNeeded - 1) / INCIDENT_PAGE_SIZE) + 1;
+          const batches = await Promise.all(Array.from({ length: lastPage - firstPage + 1 }, (_, index) =>
+            fetchIncidents(`/api/incidents?status=resolved&batch=${INCIDENT_PAGE_SIZE}&page=${firstPage + index}`)));
+          resolved = batches.flat().slice(resolvedOffset % INCIDENT_PAGE_SIZE, resolvedOffset % INCIDENT_PAGE_SIZE + resolvedNeeded);
+        }
+        const window = [...openWindow, ...resolved];
         if (controller.signal.aborted) return;
-        setIncidents((current) => mergeIncidents(current, batches.flat()));
+        setIncidents((known) => mergeIncidents(known, [...ongoing, ...resolved]));
+        setOpenIncidentIds(ongoing.map((incident) => incident.incidentId));
+        setPageIncidentIds(window.slice(0, INCIDENT_PAGE_SIZE).map((incident) => incident.incidentId));
         setLoadedIncidentPage(incidentPage);
-        setIncidentsHaveMore(batches[batches.length - 1].length === INCIDENT_PAGE_SIZE);
-        loadedIncidentRevision.current = incidentRevision;
+        setIncidentsHaveMore(window.length > INCIDENT_PAGE_SIZE);
         setIncidentsFailed(false);
         retry = false;
       } catch {
@@ -163,6 +178,11 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
       try { parsed = incidentSchema.safeParse(JSON.parse((event as MessageEvent).data)); } catch { return; }
       if (!parsed.success) return;
       setIncidents((current) => mergeIncidents(current, [parsed.data]));
+      const incident = parsed.data;
+      setOpenIncidentIds((current) => incident.status === "open"
+        ? Array.from(new Set([...current, incident.incidentId]))
+        : current.filter((id) => id !== incident.incidentId));
+      setIncidentRevision((current) => current + 1);
     });
 
     // Retry failed snapshots only; agent health is owned by the server.
@@ -195,12 +215,12 @@ export default function LiveDashboard({ initialSnapshot, initialFailed }: {
           <a href="/" className="text-nexus-blue underline underline-offset-4">Refresh data</a>
         </div>
         <IncidentCard incidents={incidents} agents={cards.map((card) => card.agent)} loading={incidentsLoading} failed={incidentsFailed}
-          visibleCount={loadedIncidentPage * INCIDENT_PAGE_SIZE} hasMore={incidentsHaveMore || incidents.length > loadedIncidentPage * INCIDENT_PAGE_SIZE}
-          onShowMore={() => {
-            if (incidentsLoading) return;
+          openIncidentIds={openIncidentIds} pageIncidentIds={pageIncidentIds} page={loadedIncidentPage} hasMore={incidentsHaveMore}
+          onPageChange={(page) => {
+            if (incidentsLoading || page < 1) return;
             setIncidentsLoading(true);
-            if (incidentPage === loadedIncidentPage + 1) setIncidentRevision((current) => current + 1);
-            else setIncidentPage(loadedIncidentPage + 1);
+            if (incidentPage === page) setIncidentRevision((current) => current + 1);
+            else setIncidentPage(page);
           }} />
         {cards.length === 0 ? (
           <p role="status" className="w-full rounded-2xl border border-zinc-200 p-6 text-sm text-zinc-500 dark:border-zinc-800">{failed ? "Unable to load agents. Retrying the connection." : "No agents registered yet."}</p>

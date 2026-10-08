@@ -54,24 +54,33 @@ function IncidentEntry({ incident, name, formatTime }: {
   );
 }
 
-export default function IncidentCard({ incidents, agents, loading, failed, visibleCount, hasMore, onShowMore }: {
+export default function IncidentCard({ incidents, agents, loading, failed, openIncidentIds, pageIncidentIds, page, hasMore, onPageChange }: {
   incidents: DashboardIncident[];
   agents: { agentId: string; agentName: string }[];
   loading: boolean;
   failed: boolean;
-  visibleCount: number;
+  openIncidentIds: string[];
+  pageIncidentIds: string[];
+  page: number;
   hasMore: boolean;
-  onShowMore: () => void;
+  onPageChange: (page: number) => void;
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const titleId = useId();
   const historyId = useId();
   const timeZone = useSyncExternalStore(subscribeToTimezone, clientTimezone, serverTimezone);
-  const open = incidents.filter((incident) => incident.status === "open");
+  const byId = new Map(incidents.map((incident) => [incident.incidentId, incident]));
+  const open = openIncidentIds.flatMap((id) => {
+    const incident = byId.get(id);
+    return incident?.status === "open" ? [incident] : [];
+  }).sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.incidentId.localeCompare(a.incidentId));
   const expanded = showHistory;
   const color = open.length === 0 ? "text-nexus-blue" : open.some((incident) => incident.severity === "DOWN") ? "text-nexus-red" : "text-nexus-yellow";
-  // Keep the entire list mounted so closing can animate without replacing it.
-  const visible = incidents.slice().sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt) || b.incidentId.localeCompare(a.incidentId)).slice(0, visibleCount);
+  // Keep the current page mounted so closing can animate without replacing it.
+  const visible = pageIncidentIds.flatMap((id) => {
+    const incident = byId.get(id);
+    return incident ? [incident] : [];
+  });
   const names = new Map(agents.map((agent) => [agent.agentId, agent.agentName]));
   const formatter = new Intl.DateTimeFormat("en-GB", { timeZone, dateStyle: "medium", timeStyle: "short" });
   const formatTime = (value: string) => formatter.format(new Date(value));
@@ -95,12 +104,13 @@ export default function IncidentCard({ incidents, agents, loading, failed, visib
               {visible.map((incident) => <IncidentEntry key={incident.incidentId} incident={incident} name={names.get(incident.agentId) ?? incident.agentId} formatTime={formatTime} />)}
             </ul>
           )}
-          {hasMore && (
-            <button type="button" onClick={onShowMore} disabled={loading}
-              className="w-full border-t border-zinc-200 px-6 py-4 text-left text-sm text-zinc-500 transition-colors hover:bg-zinc-50 hover:text-nexus-blue focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-nexus-blue disabled:cursor-wait disabled:opacity-50 motion-reduce:transition-none dark:border-zinc-800 dark:hover:bg-zinc-950 sm:px-8">
-              {loading ? "Loading…" : "Show more"}
-            </button>
-          )}
+          <nav aria-label="Incident pages" className="flex items-center justify-between gap-4 border-t border-zinc-200 px-6 py-4 text-sm dark:border-zinc-800 sm:px-8">
+            <button type="button" onClick={() => onPageChange(page - 1)} disabled={loading || page === 1}
+              className="text-zinc-500 transition-colors hover:text-nexus-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-nexus-blue disabled:cursor-default disabled:opacity-30 motion-reduce:transition-none">Previous</button>
+            <span role="status" className="text-xs tabular-nums text-zinc-500">{loading ? "Loading…" : `Page ${page}`}</span>
+            <button type="button" onClick={() => onPageChange(page + 1)} disabled={loading || !hasMore}
+              className="text-zinc-500 transition-colors hover:text-nexus-blue focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-nexus-blue disabled:cursor-default disabled:opacity-30 motion-reduce:transition-none">Next</button>
+          </nav>
         </div>
       </div>
     </article>
