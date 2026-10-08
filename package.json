@@ -8,6 +8,7 @@
     "agent",
     "shared"
   ],
+  "license": "AGPL-3.0-only",
   "scripts": {
     "test": "npm run build -w shared && npm run test -w shared && npm run test -w server",
     "dev:server": "npm run dev -w server",
