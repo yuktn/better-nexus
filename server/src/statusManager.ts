@@ -125,7 +125,7 @@ export class StatusManager {
 
         for (const agent of agentArray) {
             if (Date.now() - agent.lastSeenOn > 10_000 && agent.status !== "DOWN") {
-                changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")
+                await changeAgentStatus(agent.agentId, "DOWN", "TIMEOUT")
                 await incidentManager.addIncident(agent.agentId, "The server isn't getting responses from this agent.", "TIMEOUT", new Date(), "DOWN", "Agent Unreachable")
             }
         }

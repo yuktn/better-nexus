@@ -49,19 +49,19 @@ export class IncidentManager {
     }
 
     async addMessage(incidentId: string, message: string, timestamp: Date) {
-        const incident = await incidents.findOneAndUpdate({incidentId}, {$push: {messages: { timestamp, message }}, $set: { updatedAt: new Date()}})
-        
-        sendSseEvent("incidentUpdate", incident)
+        const incident = await incidents.findOneAndUpdate({incidentId}, {$push: {messages: { timestamp, message }}, $set: { updatedAt: new Date()}},  {returnDocument: "after"})
 
         if (!incident) return
+
+        sendSseEvent("incidentUpdate", incident)
     }
 
     async editTitle(incidentId: string, title: string) {
-        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title, updatedAt: new Date()}})
-
-        sendSseEvent("incidentUpdate", incident)
+        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title, updatedAt: new Date()}},  {returnDocument: "after"})
 
         if (!incident) return
+
+        sendSseEvent("incidentUpdate", incident)
     }
 
     async resolveIncident(incidentId: string, agentId: string) {

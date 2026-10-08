@@ -306,7 +306,7 @@ api.post('/hb', agentAuth, async (_req: Request, res: Response) => {
 		const result = await heartbeats.insertOne(hb)
 
 		sendSseEvent('heartbeat', hb)
-		statusManager.onHeartbeat(agentId, { temp, cpu, memory, timestamp })
+		await statusManager.onHeartbeat(agentId, { temp, cpu, memory, timestamp })
 
 		if (result.insertedId && lastSeenOnUpdate.matchedCount === 1) {
 			const id = result.insertedId
@@ -482,7 +482,7 @@ api.get('/incidents', async (_req: Request, res: Response) => {
 	const result = IncidentRequestSchema.safeParse(input);
 
 	if (!result.success) {
-		return res.status(400).json({ success: false, error: "Bad Request." });
+		return res.status(400).json({ success: false, error: result.error.issues });
 	}
 
 	const { status, pagination } = result.data;
@@ -503,7 +503,10 @@ api.get('/incidents', async (_req: Request, res: Response) => {
 api.get('/incidents/:id', async (_req: Request, res: Response) => {
 	const { id: incidentId } = _req.params;
 
-	const data = await incidents.find({ incidentId }).toArray();
+	const data = await incidents.findOne({ incidentId });
+
+	if (!data) return res.status(404).json({ success: false, error: "Not found" });
+
 	return res.status(200).json({ success: true, data });
 })
 

@@ -67,7 +67,7 @@ admin.post('/admin/register', adminAuth, async (_req: Request, res: Response) =>
 
 //#region /admin/incidents
 
-// /admin/incidents/:id
+// /admin/incidents/
 
 admin.post('/admin/incidents', adminAuth, async (_req: Request, res: Response) => {
     const result = IncidentEditRequestSchema.safeParse(_req.body)
@@ -87,7 +87,7 @@ admin.post('/admin/incidents', adminAuth, async (_req: Request, res: Response) =
             break;
     }
 
-    const data = await incidents.find({incidentId})
+    const data = await incidents.findOne({incidentId})
 
     return res.status(200).json({
         success: true, data
