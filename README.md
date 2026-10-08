@@ -56,4 +56,4 @@ There was minimal use of AI in the backend (server/agent). All the logic, types,
 
 The frontend was designed by myself, but the implementation had substantial use of AI.  
 
-Linux installation script was assisted by AI.
+Tests and Linux installation scripts was assisted by AI.
