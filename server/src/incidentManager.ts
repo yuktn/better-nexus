@@ -43,13 +43,13 @@ export class IncidentManager {
             resolvedAt: null
         }
 
-        sendSseEvent("incidentUpdate", incident)
-
         await incidents.insertOne(incident)
+
+        sendSseEvent("incidentUpdate", incident)
     }
 
     async addMessage(incidentId: string, message: string, timestamp: Date) {
-        const incident = await incidents.findOneAndUpdate({incidentId}, {$push: {messages: { timestamp, message }}, $set: { updatedAt: new Date()}},  {returnDocument: "after"})
+        const incident = await incidents.findOneAndUpdate({ incidentId }, { $push: { messages: { timestamp, message } }, $set: { updatedAt: new Date() } }, { returnDocument: "after" })
 
         if (!incident) return
 
@@ -57,7 +57,7 @@ export class IncidentManager {
     }
 
     async editTitle(incidentId: string, title: string) {
-        const incident = await incidents.findOneAndUpdate({incidentId}, {$set: { title, updatedAt: new Date()}},  {returnDocument: "after"})
+        const incident = await incidents.findOneAndUpdate({ incidentId }, { $set: { title, updatedAt: new Date() } }, { returnDocument: "after" })
 
         if (!incident) return
 
