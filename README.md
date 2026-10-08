@@ -4,7 +4,7 @@
   <img src="./docs/nexus-plus-logo.svg" alt="better nexus logo" width="400">
 </p>
 
-## Release 0.1.0 is live!
+## Release 0.1.1 is live!
 
 Visit [better nexus](https://nexus.yuktn.dev) to see better-nexus in action!
 

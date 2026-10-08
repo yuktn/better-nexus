@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import { agentVersion } from "../version.js";
+
 const command = process.argv[2];
 
 switch (command) {
@@ -17,7 +19,7 @@ switch (command) {
 
     default:
         console.log(`
-nexus-agent v0.1.0
+nexus-agent v${agentVersion}
 
 Usage:
   nexus-agent setup

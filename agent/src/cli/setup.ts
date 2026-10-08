@@ -1,4 +1,5 @@
 import { configDir, configPath, tokenPath } from "../config.js";
+import { agentVersion } from "../version.js";
 import { intro, cancel, text, outro, log, spinner, select, isCancel } from '@clack/prompts';
 import { mkdir, writeFile, readFile } from "node:fs/promises";
 import {
@@ -106,7 +107,7 @@ try {
 
     const request: AgentRegisterRequest = {
         agentName,
-        agentNexusVersion: "v0.1.0",
+        agentNexusVersion: `v${agentVersion}`,
         platform,
     }
 

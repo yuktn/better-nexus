@@ -2,7 +2,7 @@
 
 set -Eeuo pipefail
 
-VERSION="${NEXUS_VERSION:-v0.1.0}"
+VERSION="${NEXUS_VERSION:-v0.1.1}"
 REPO="https://github.com/yuktn/better-nexus.git"
 
 INSTALL_DIR="/opt/better-nexus-agent"
@@ -202,7 +202,35 @@ if [[ ! -f "$CONFIG_DIR/config.json" || ! -f "$CONFIG_DIR/agent.token" ]]; then
     "$CONFIG_DIR/config.json" \
     "$CONFIG_DIR/agent.token"
 else
-  info "Existing agent configuration found; keeping it"
+  info "Existing agent configuration found; updating the agent version"
+
+  runuser -u "$NEXUS_USER" -- \
+    "$NODE_BIN" --input-type=module - \
+    "$INSTALL_DIR/agent/package.json" "$CONFIG_DIR/config.json" <<'NODE'
+import { readFile, writeFile, rename, rm } from "node:fs/promises";
+
+const [packagePath, configPath] = process.argv.slice(2);
+const metadata = JSON.parse(await readFile(packagePath, "utf8"));
+const config = JSON.parse(await readFile(configPath, "utf8"));
+
+if (typeof metadata.version !== "string" || !metadata.version) {
+  throw new Error("Installed agent package has no version.");
+}
+
+const version = `v${metadata.version}`;
+if (config.agentNexusVersion !== version) {
+  config.agentNexusVersion = version;
+  const temporaryPath = `${configPath}.${process.pid}.tmp`;
+  try {
+    await writeFile(temporaryPath, JSON.stringify(config, null, 2) + "\n", { mode: 0o600, flag: "wx" });
+    await rename(temporaryPath, configPath);
+  } finally {
+    await rm(temporaryPath, { force: true });
+  }
+}
+
+console.log(`Agent configuration version: ${version}`);
+NODE
 fi
 
 # ---------------------------------------------------------------------------
